@@ -1,6 +1,6 @@
 import json
 from py import math
-from py.configuration import Configuration
+from py.configuration import InputConfiguration
 from py.polygon import Polygon
 
 def to_point_list(json_polygon):
@@ -30,7 +30,7 @@ def read_instance(filename, sort=None, expand=False):
     else:
         assert(sort is None)
         pass
-    return json_dict["instance_name"], Configuration(
+    return json_dict["instance_name"], InputConfiguration(
         container,
         [item[2] for item in items],
         [item[0] for item in items],

@@ -1,10 +1,9 @@
 class Configuration:
 
-    def __init__(self, container, items, values=[], quantities=[]):
+    def __init__(self, container, items, values):
         self.container = container
         self.items = items
         self.values = values
-        self.quantities = quantities
 
     def get_max_value(self):
         if len(self.values) == 0: return 0
@@ -14,9 +13,24 @@ class Configuration:
         if len(self.values) == 0: return 0
         return min(self.values)
 
+class InputConfiguration(Configuration):
+
+    def __init__(self, container, items, values, quantities):
+        super().__init__(container, items, values)
+        self.quantities = quantities
+
     def get_cpp_items(self):
         return [
             (self.values[i], self.quantities[i], self.items[i].get_approx_representation())
             for i in range(len(self.items))
         ]
+
+class OutputConfiguration(Configuration):
+
+    def __init__(self, items, values, input_conf):
+        super().__init__(input_conf.container, items, values)
+        self.input_conf = input_conf
+
+    def get_score(self):
+        return sum(self.values)
 

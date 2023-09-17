@@ -70,13 +70,13 @@ bool is_inside_polygon(const Polygon& p1, const Polygon& p2) {
 }
 
 
-vector<Polygon> dummy_algorithm(
+vector<pair<int,Polygon>> dummy_algorithm(
     Polygon container,
     vector<tuple<int,int,Polygon>> items
 ) {
     auto lpc = get_lowest_point(container);
-    foe(item, items) {
-        auto [value, quantity, pol] = item;
+    fon(i, sz(items)) {
+        auto [value, quantity, pol] = items[i];
         auto lp = get_lowest_point(pol);
         Transformation translate(
             CGAL::TRANSLATION,
@@ -84,7 +84,7 @@ vector<Polygon> dummy_algorithm(
         );
         Polygon tpol = transform(translate, pol);
         if(is_inside_polygon(tpol, container)) {
-            return {tpol};
+            return {{i, tpol}};
         }
     }
     return {};

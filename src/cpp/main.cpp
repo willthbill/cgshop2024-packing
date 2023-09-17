@@ -23,27 +23,27 @@ pair<Polygon,vector<tuple<int,int,Polygon>>> input2cgal(
     return {container, items};
 }
 
-vector<vector<pair<string,string>>> cgal2output(
-    vector<Polygon>& tmp
+vector<pair<int,vector<pair<string,string>>>> cgal2output(
+    vector<pair<int,Polygon>>& tmp
 ) {
-    vector<vector<pair<string,string>>> res;
+    vector<pair<int,vector<pair<string,string>>>> res;
     for(int i = 0; i < tmp.size(); i++) {
-        res.push_back(polygon2points(tmp[i]));
+        res.eb(i, polygon2points(tmp[i].se));
     }
     return res;
 }
 
-#define OUT_TYPE vector<Polygon>
+#define OUT_TYPE vector<pair<int,Polygon>>
 #define IN_TYPE Polygon,vector<tuple<int,int,Polygon>>
 
 OUT_TYPE dummy_algorithm(IN_TYPE);
 
-vector<vector<pair<string,string>>> main_algorithm(
+vector<pair<int,vector<pair<string,string>>>> main_algorithm(
     vector<pii>& _container,
     vector<tuple<int,int,vector<pii>>>& _items
 ) {
     auto [container, items] = input2cgal(_container, _items);
-    vector<Polygon> res = dummy_algorithm(container, items);
+    vector<pair<int,Polygon>> res = dummy_algorithm(container, items);
     return cgal2output(res);
 }
 
