@@ -1,0 +1,10 @@
+env.list
+.bash_history
+images
+input
+out
+build
+tmp
+**/__pycache__/
+submission.zip
+compile_commands.json

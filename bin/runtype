@@ -1,0 +1,1 @@
+for file in ./input/examples_2023-08-17/examples_01/$1*.json; do  	INSTANCE_FILE=$file runpythonfile main.py; done

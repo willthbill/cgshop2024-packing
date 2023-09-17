@@ -1,0 +1,14 @@
+#!/bin/bash
+
+source env.list
+
+xhost +local:docker
+
+docker run \
+    -v .:/app/max-polygon-packing \
+    -v "$CGSHOP_LIB_PATH_HOST":/app/cgshop-lib \
+    -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
+    -v ./.bash_history:/root/.bash_history \
+    --env-file ./env.list \
+    -it max-polygon-packing
+

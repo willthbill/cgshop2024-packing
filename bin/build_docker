@@ -1,0 +1,10 @@
+#!/bin/bash
+
+source env.list
+
+docker build \
+    --build-arg GITHUB_AUTH="${GITHUB_AUTH}" \
+    -t max-polygon-packing \
+    "$@" \
+    .
+

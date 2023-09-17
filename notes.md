@@ -1,0 +1,4 @@
+# setup
+- Slurm
+- docker
+- git
