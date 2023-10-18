@@ -1,62 +1,47 @@
+#pragma once
+
 #include <bits/stdc++.h>
 #include <CGAL/SCIP_mixed_integer_program_traits.h>
 
 #include "lib/util/cgal.h"
 
-class MIP_Solver;
+typedef CGAL::SCIP_mixed_integer_program_traits<double>      MIP_Solver;
+// typedef CGAL::SCIP_mixed_integer_program_traits<FT>          MIP_Solver;
+typedef typename MIP_Solver::Variable                          Variable;
+typedef typename MIP_Solver::Linear_objective          Linear_objective;
+typedef typename MIP_Solver::Linear_constraint        Linear_constraint;
 
 class MIP {
 
 private:
     int constraint_name = 0;
     MIP_Solver solver;
-    map<string,Variable*> vars;
-    vector<string> vars_order;
+    std::map<std::string,Variable*> vars;
+    std::vector<std::string> vars_order;
 
-    string get_constraint_name();
+    std::string get_constraint_name();
 
-    void _add_constraint(vector<pair<string,FT>> a, FT b, string type);
+    void _add_constraint(std::vector<std::pair<std::string,FT>> a, FT b, std::string type);
 
-    void _add_variable(string name, string type); 
+    void _add_variable(std::string name, std::string type); 
 
-    void _set_objective(string type, vector<pair<string,FT>> c); 
+    void _set_objective(std::string type, std::vector<std::pair<std::string,FT>> c); 
 
 public:
 
+    void add_eq_constraint(std::vector<std::pair<std::string,FT>> a, FT b); 
 
-    void add_eq_constraint(vector<pair<string,FT>> a, FT b); 
+    void add_leq_constraint(std::vector<std::pair<std::string,FT>> a, FT b); 
 
-    void add_leq_constraint(vector<pair<string,FT>> a, FT b); 
+    void add_geq_constraint(std::vector<std::pair<std::string,FT>> a, FT b); 
 
-    void add_geq_constraint(vector<pair<string,FT>> a, FT b) {
-        _add_constraint(a,b,"geq");
-    }
+    void add_binary_variable(std::string name); 
 
-    void add_binary_variable(string name) {
-        _add_variable(name, "bin");
-    }
+    void add_continuous_variable(std::string name); 
 
-    void add_continuous_variable(string name) {
-        _add_variable(name, "con");
-    }
+    void set_max_objective(std::vector<std::pair<std::string,FT>> c); 
 
-    void set_max_objective(vector<pair<string,FT>> c) {
-        _set_objective("max", c);
-    }
+    void set_min_objective(std::vector<std::pair<std::string,FT>> c); 
 
-    void set_min_objective(vector<pair<string,FT>> c) {
-        _set_objective("min", c);
-    }
-
-    map<string,FT> solve() {
-        const vector<double>& results = solver.solution();
-        // TODO: are these actually exact results or are they internally converted to doubles?
-        // TODO: probably more efficient with doubles though
-        assert(sz(results) == sz(vars_order));
-        map<string,FT> res;
-        fon(i, sz(results)) {
-            res[vars_order[i]] = results[i];
-        }
-        return res;
-    }
+    std::map<std::string,FT> solve(); 
 };

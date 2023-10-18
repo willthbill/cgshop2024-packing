@@ -2,8 +2,8 @@
 #include <CGAL/Aff_transformation_2.h>
 #include <CGAL/Boolean_set_operations_2.h>
 
-#include "lib2/configuration_space.cpp"
-#include "lib2/mip.cpp"
+#include "lib2/configuration_space.h"
+#include "lib2/mip.h"
 #include "util.cpp"
 #include "lib/geometry/partition_constructor.h"
 #include "lib/util/geometry_utils.h"

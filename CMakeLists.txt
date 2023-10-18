@@ -49,7 +49,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I$ENV{SRC_PATH_HOST}")
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "cpp")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__local__")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Wextra -pedantic -Wshadow -Wformat=2 -Wfloat-equal -Wconversion -Wlogical-op -Wshift-overflow=2 -Wduplicated-cond -Wcast-qual -Wcast-align -Wfatal-errors")
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Wextra -pedantic -Wshadow -Wformat=2 -Wfloat-equal -Wconversion -Wlogical-op -Wshift-overflow=2 -Wduplicated-cond -Wcast-qual -Wcast-align -Wfatal-errors")
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fsanitize=undefined -fno-sanitize-recover -fstack-protector")
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -D_FORTIFY_SOURCE=2")
 
@@ -71,17 +71,28 @@ execute_process(COMMAND ./bin/getpybindsuffix.sh OUTPUT_VARIABLE pybind11_suffix
 # add_library(lib${pybind11_suffix} SHARED src/cpp/algorithms/lib.cpp)
 # target_link_libraries(lib${pybind11_suffix} CGAL::CGAL lib)
 
+set(CGALLIB CGAL::CGAL CGAL::SCIP_support)
+
 ###### CPP ######
 ### lib2 ###
+add_library(util SHARED src/cpp/lib2/util.cpp)
+target_link_libraries(util ${CGALLIB})
+
+add_library(io SHARED src/cpp/io.cpp)
+target_link_libraries(io ${CGALLIB} util geometry_utils)
+
 add_library(configuration_space SHARED src/cpp/lib2/configuration_space.cpp)
-target_link_libraries(configuration_space CGAL::CGAL geometry_utils)
+target_link_libraries(configuration_space ${CGALLIB} geometry_utils)
+
+add_library(mip SHARED src/cpp/lib2/mip.cpp)
+target_link_libraries(mip ${CGALLIB} geometry_utils)
 
 ### algorithms ###
 #add_library(dummy_algorithm SHARED src/cpp/algorithms/dummy.cpp)
-#target_link_libraries(dummy_algorithm CGAL::CGAL)
+#target_link_libraries(dummy_algorithm CGAL::CGAL util)
 
 add_library(optimal_algorithm SHARED src/cpp/algorithms/optimal.cpp)
-target_link_libraries(optimal_algorithm CGAL::CGAL CGAL::SCIP_support partition_constructor geometry_utils)
+target_link_libraries(optimal_algorithm ${CGALLIB} partition_constructor mip configuration_space geometry_utils io)
 
 #add_executable(mip_example src/cpp/lib2/mip_example.cpp)
 #target_link_libraries(mip_example CGAL::CGAL CGAL::SCIP_support)
@@ -93,5 +104,6 @@ target_link_libraries(
     # dummy_algorithm
     optimal_algorithm
     com CGAL::CGAL
+    io
 )
 

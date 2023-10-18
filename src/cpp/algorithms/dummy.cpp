@@ -2,7 +2,7 @@
 #include <CGAL/Aff_transformation_2.h>
 #include <CGAL/Boolean_set_operations_2.h>
 
-#include "lib2/util.cpp"
+#include "lib2/util.h"
 #include "lib/util/geometry_utils.h"
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"

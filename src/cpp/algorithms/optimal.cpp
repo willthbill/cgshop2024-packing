@@ -2,20 +2,28 @@
 #include <CGAL/Aff_transformation_2.h>
 #include <CGAL/Boolean_set_operations_2.h>
 
-#include "lib2/configuration_space.cpp"
-#include "lib2/mip.cpp"
-#include "util.cpp"
+#include "lib2/configuration_space.h"
+#include "lib2/mip.h"
+#include "io.h"
 #include "lib/geometry/partition_constructor.h"
 #include "lib/util/geometry_utils.h"
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
+#include "lib/util/debug.h"
 
 using namespace std;
 
 const ll inf = 1e9;
-const ll biginf = 1e18;
+const ll biginf = 1e10;
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
+
+pair<string,string> get_ref_coord_variable_names(int idx) {
+    string x = "polygon_ref_" + to_string(idx) +  "_x";
+    string y = "polygon_ref_" + to_string(idx) +  "_y";
+    return {x,y};
+}
+
 PackingOutput optimal_algorithm(PackingInput input) {
     ItemsContainer items = input.items.expand();
     int binaries = 0;
@@ -23,9 +31,15 @@ PackingOutput optimal_algorithm(PackingInput input) {
     vector<string> in_use_binaries;
     vector<pair<string,FT>> obj_terms;
     fon(i, sz(items)) {
-        in_use_binaries[i] = "is_polygon_" + to_string(i) + "_in_use";
+        in_use_binaries.push_back("is_polygon_" + to_string(i) + "_in_use");
         problem.add_binary_variable(in_use_binaries[i]);
         obj_terms.push_back({in_use_binaries[i], items[i].value});
+    }
+    problem.set_max_objective(obj_terms);
+    fon(i, sz(items)) {
+        auto [x, y] = get_ref_coord_variable_names(i);
+        problem.add_continuous_variable(x);
+        problem.add_continuous_variable(y);
     }
     fon(i, sz(items)) {
         fon(j, sz(items)) {
@@ -45,14 +59,8 @@ PackingOutput optimal_algorithm(PackingInput input) {
             }
             Point ref = items[j].get_reference_point(); // (x1,y1)
             // Point centroid = get_centroid(get<1>(items[i])); // (x2,y2)
-            string x1 = "polygon_ref0_" + to_string(j) +  "_x";
-            string y1 = "polygon_ref0_" + to_string(j) +  "_y";
-            string x2 = "polygon_ref0_" + to_string(i) +  "_x";
-            string y2 = "polygon_ref0_" + to_string(i) +  "_y";
-            problem.add_continuous_variable(x1);
-            problem.add_continuous_variable(y1);
-            problem.add_continuous_variable(x2);
-            problem.add_continuous_variable(y2);
+            auto [x1, y1] = get_ref_coord_variable_names(j);
+            auto [x2, y2] = get_ref_coord_variable_names(i);
             vector<string> binvars;
             foe(tri, partition) {
                 ASSERT(tri.orientation() == CGAL::COUNTERCLOCKWISE, "must have counterclockwise orientation");
@@ -94,8 +102,7 @@ PackingOutput optimal_algorithm(PackingInput input) {
     auto solution = problem.solve();
     PackingOutput output (input);
     fon(i, sz(items)) {
-        string xkey = "polygon_ref0_" + to_string(i) +  "_x";
-        string ykey = "polygon_ref0_" + to_string(i) +  "_y";
+        auto [xkey, ykey] = get_ref_coord_variable_names(i);
         FT x = solution[xkey];
         FT y = solution[ykey];
         Item new_item = items[i].move_first_point(Point(x,y));

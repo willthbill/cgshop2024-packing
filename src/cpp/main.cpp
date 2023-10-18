@@ -2,10 +2,11 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "util.cpp"
+#include "io.h"
 #include "lib/util/com.h"
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
+#include "lib/util/debug.h"
 
 namespace py = pybind11;
 
@@ -42,10 +43,13 @@ OUT_TYPE dummy_algorithm(IN_TYPE);
 OUT_TYPE optimal_algorithm(IN_TYPE);
 
 vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorithm(
-    vector<pii>& _container,
-    vector<tuple<int,int,vector<pii>>>& _items
+    vector<pii> _container,
+    vector<tuple<int,int,vector<pii>>> _items
 ) {
     PackingInput input = input2cgal(_container, _items);
+    cout << "[c++] input information: " << endl;
+    cout << "      number of items: " << sz(input.items) << endl;
+    cout << "      number of vertices on container: " << sz(input.container) << endl;
     PackingOutput res = optimal_algorithm(input);
     { // extra validation
         PackingOutput val (input);
