@@ -13,9 +13,9 @@
 
 using namespace std;
 
-const double scale=1e-6;
+const double scale=1;
 const ll inf = 1e3;
-const ll biginf = 1e12;
+const ll biginf = 1e8;
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
 // TODO: maybe see if there are common factors (or something like that) on each side so we can make numbers smaller
