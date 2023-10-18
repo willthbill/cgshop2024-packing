@@ -1,5 +1,4 @@
 from py.algorithm import run_algorithm
-from py.configuration import Configuration
 from py.io import read_instance
 from py.visualize import visualize
 import os

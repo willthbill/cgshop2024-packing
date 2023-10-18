@@ -1,6 +1,5 @@
 from cpp.main import main_algorithm
 from py.configuration import InputConfiguration, OutputConfiguration
-from py.polygon import Polygon
 
 def run_algorithm(input_conf : InputConfiguration):
     container = input_conf.container.get_approx_representation()

@@ -66,6 +66,8 @@ alias git='youre in docker'
 
 ### prompt ###
 export PS1="\[\033[32m\]\u@\h\[\033[00m\]:\[\033[34m\]\w\[\033[33m\](\$?)\[\033[31m\]$ \[\033[00m\]"
+# tmux fix
+export PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
 
 ### source ###
 source /usr/share/doc/pkgfile/command-not-found.bash

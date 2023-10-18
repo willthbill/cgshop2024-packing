@@ -25,6 +25,9 @@ RUN pip install --no-cache-dir matplotlib numpy pybind11
 
 COPY .bashrc /root/
 
+RUN echo 'source /root/.bashrc' >> /root/.profile
+RUN echo 'source /root/.bashrc' >> /root/.bash_profile
+
 # Set the default command for the container
 WORKDIR /app/max-polygon-packing
 CMD ["/bin/bash", "-c", "direnv allow; bash"]

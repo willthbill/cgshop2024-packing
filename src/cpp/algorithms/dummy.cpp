@@ -2,6 +2,7 @@
 #include <CGAL/Aff_transformation_2.h>
 #include <CGAL/Boolean_set_operations_2.h>
 
+#include "lib2/util.cpp"
 #include "lib/util/geometry_utils.h"
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
@@ -9,19 +10,6 @@
 typedef CGAL::Aff_transformation_2<K> Transformation;
 
 using namespace std;
-
-Point get_lowest_point(const Polygon& polygon) {
-    if (polygon.is_empty()) {
-        throw std::runtime_error("Polygon is empty!");
-    }
-    Point lowest_point = polygon.vertex(0);
-    for (Polygon::Vertex_iterator it = polygon.vertices_begin(); it != polygon.vertices_end(); ++it) {
-        if (it->y() < lowest_point.y() || (it->y() == lowest_point.y() && it->x() < lowest_point.x())) {
-            lowest_point = *it;
-        }
-    }
-    return lowest_point;
-}
 
 K::FT compute_area(const Polygon_with_holes& poly_with_holes) {
     K::FT area = poly_with_holes.outer_boundary().area();

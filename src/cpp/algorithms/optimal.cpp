@@ -4,6 +4,7 @@
 
 #include "lib2/configuration_space.cpp"
 #include "lib2/mip.cpp"
+#include "util.cpp"
 #include "lib/geometry/partition_constructor.h"
 #include "lib/util/geometry_utils.h"
 #include "lib/util/cgal.h"
@@ -14,24 +15,22 @@ using namespace std;
 const ll inf = 1e9;
 const ll biginf = 1e18;
 
-vector<pair<int,Polygon>> optimal_algorithm(
-    Polygon container,
-    vector<tuple<int,int,Polygon>> items
-) {
-    int n = sz(items);
+// TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
+PackingOutput optimal_algorithm(PackingInput input) {
+    ItemsContainer items = input.items.expand();
     int binaries = 0;
     MIP problem;
     vector<string> in_use_binaries;
     vector<pair<string,FT>> obj_terms;
-    fon(i, n) {
+    fon(i, sz(items)) {
         in_use_binaries[i] = "is_polygon_" + to_string(i) + "_in_use";
         problem.add_binary_variable(in_use_binaries[i]);
-        obj_terms.push_back({in_use_binaries[i], get<1>(items[i])});
+        obj_terms.push_back({in_use_binaries[i], items[i].value});
     }
-    fon(i, n) {
-        fon(j, n) {
-            Polygon_set disallowed (get<2>(items[j]));
-            ConfigurationSpace cp (disallowed, get<2>(items[i]));
+    fon(i, sz(items)) {
+        fon(j, sz(items)) {
+            Polygon_set disallowed (items[j].pol);
+            ConfigurationSpace cp (disallowed, items[i].pol, items[i].get_reference_point());
             vector<Polygon> partition;
             {
                 Polygon square; square.pb(Point(-inf,-inf));square.pb(Point(inf,-inf));square.pb(Point(inf,inf));square.pb(Point(-inf,inf));
@@ -44,12 +43,12 @@ vector<pair<int,Polygon>> optimal_algorithm(
                 PartitionConstructor pc (polygon);
                 partition = pc.get_constrained_delaunay_triangulation();
             }
-            Point centroid = get_centroid(get<2>(items[j])); // (x1,y1)
+            Point ref = items[j].get_reference_point(); // (x1,y1)
             // Point centroid = get_centroid(get<1>(items[i])); // (x2,y2)
-            string x1 = "polygon_centroid_" + to_string(j) +  "_x";
-            string y1 = "polygon_centroid_" + to_string(j) +  "_y";
-            string x2 = "polygon_centroid_" + to_string(i) +  "_x";
-            string y2 = "polygon_centroid_" + to_string(i) +  "_y";
+            string x1 = "polygon_ref0_" + to_string(j) +  "_x";
+            string y1 = "polygon_ref0_" + to_string(j) +  "_y";
+            string x2 = "polygon_ref0_" + to_string(i) +  "_x";
+            string y2 = "polygon_ref0_" + to_string(i) +  "_y";
             problem.add_continuous_variable(x1);
             problem.add_continuous_variable(y1);
             problem.add_continuous_variable(x2);
@@ -61,8 +60,8 @@ vector<pair<int,Polygon>> optimal_algorithm(
                 problem.add_binary_variable(b);
                 binvars.push_back(b);
                 fon(k, sz(tri)) {
-                    Vector c1 = tri[k] - centroid;
-                    Vector c2 = tri[(k+1) % sz(tri)] - centroid;
+                    Vector c1 = tri[k] - ref;
+                    Vector c2 = tri[(k+1) % sz(tri)] - ref;
                     Vector v1 (c2.x() - c1.x(), c2.y() - c1.y());
                     // v2 = (x2 - x1 - c2.x(), y2 - y1 - c2.y());
                     // Cross product
@@ -93,5 +92,15 @@ vector<pair<int,Polygon>> optimal_algorithm(
         }
     }
     auto solution = problem.solve();
+    PackingOutput output (input);
+    fon(i, sz(items)) {
+        string xkey = "polygon_ref0_" + to_string(i) +  "_x";
+        string ykey = "polygon_ref0_" + to_string(i) +  "_y";
+        FT x = solution[xkey];
+        FT y = solution[ykey];
+        Item new_item = items[i].move_first_point(Point(x,y));
+        output.add_item(new_item);
+    }
+    return output;
 }
 
