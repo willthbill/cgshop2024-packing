@@ -12,7 +12,7 @@ struct Item {
     Polygon pol;
     int idx;
 
-    Item move_first_point(Point p);
+    Item move_ref_point(Point p);
 
     Point get_reference_point();
 

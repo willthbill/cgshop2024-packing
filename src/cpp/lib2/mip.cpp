@@ -34,9 +34,10 @@ void MIP::_add_constraint(vector<pair<string,FT>> a, FT b, string type) {
 
 void MIP::_add_variable(string name, string type) {
     ASSERT(vars.count(name) == 0, "variable " << name << " already exists");
+    cout << "[c++] Adding variable " << name << " of type " << type << endl;
     Variable* x;
     if(type == "con") {
-        x = solver.create_variable(Variable::CONTINUOUS, Variable::infinity(), Variable::infinity(), name);
+        x = solver.create_variable(Variable::CONTINUOUS, -Variable::infinity(), Variable::infinity(), name);
     } else if(type == "bin") {
         x = solver.create_variable(Variable::BINARY);
         x->set_name(name);

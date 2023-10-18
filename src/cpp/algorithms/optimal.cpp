@@ -14,7 +14,7 @@
 using namespace std;
 
 const ll inf = 1e9;
-const ll biginf = 1e10;
+const ll biginf = 1e18;
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
 
@@ -41,8 +41,28 @@ PackingOutput optimal_algorithm(PackingInput input) {
         problem.add_continuous_variable(x);
         problem.add_continuous_variable(y);
     }
+    auto add_constraints_inside_convex_polygon = [&](Polygon& pol, string x, string y, string binary) {
+        ASSERT(pol.orientation() == CGAL::COUNTERCLOCKWISE, "must have counterclockwise orientation");
+        fon(k, sz(pol)) {
+            Point c1 = pol[k];
+            Point c2 = pol[(k+1) % sz(pol)];
+            cerr << c1.x() << " " << c1.y() << endl;
+            cerr << c2.x() << " " << c2.y() << endl;
+            Vector v1 (c2.x() - c1.x(), c2.y() - c1.y());
+            // v2 = (x - c2.x(), y - c2.y())
+            // v1 cross v2 = v1.x() * (y - c2.y()) - v1.y() * (x - c2.x()) <= 0
+            // v1 cross v2 = v1.x() * y - v1.x() * c2.y() - v1.y() * x + v1.y() * c2.x() <= 0
+            // v1 cross v2 = v1.x() * y - v1.y() * x <= v1.x() * c2.y() - v1.y() * c2.x()
+            problem.add_geq_constraint(
+                {{y,v1.x()},{x,v1.y()}},//{binary,biginf}},
+                v1.x() * c2.y() - v1.y() * c2.x()// + biginf // TODO: safe in terms of casting??
+            );
+        }
+    };
     fon(i, sz(items)) {
         fon(j, sz(items)) {
+            if(i == j) continue;
+            debug("constraints for ",i,j);
             Polygon_set disallowed (items[j].pol);
             ConfigurationSpace cp (disallowed, items[i].pol, items[i].get_reference_point());
             vector<Polygon> partition;
@@ -53,6 +73,7 @@ PackingOutput optimal_algorithm(PackingInput input) {
                 auto polygons = to_polygon_vector(ps);
                 assert(sz(polygons) == 1);
                 auto polygon = polygons[0];
+                debug(polygon.number_of_holes());
                 assert(polygon.number_of_holes() == 1);
                 PartitionConstructor pc (polygon);
                 partition = pc.get_constrained_delaunay_triangulation();
@@ -99,13 +120,18 @@ PackingOutput optimal_algorithm(PackingInput input) {
             }
         }
     }
+    fon(i, sz(items)) {
+        auto [x, y] = get_ref_coord_variable_names(i);
+        add_constraints_inside_convex_polygon(input.container, x, y, in_use_binaries[i]);
+    }
     auto solution = problem.solve();
     PackingOutput output (input);
     fon(i, sz(items)) {
         auto [xkey, ykey] = get_ref_coord_variable_names(i);
         FT x = solution[xkey];
         FT y = solution[ykey];
-        Item new_item = items[i].move_first_point(Point(x,y));
+        debug(x.to_double(),y.to_double());
+        Item new_item = items[i].move_ref_point(Point(x,y));
         output.add_item(new_item);
     }
     return output;
