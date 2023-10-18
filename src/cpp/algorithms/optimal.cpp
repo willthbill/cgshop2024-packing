@@ -13,8 +13,9 @@
 
 using namespace std;
 
-const ll inf = 1000;
-const ll biginf = 1e8;
+const double scale=1e-6;
+const ll inf = 1e3;
+const ll biginf = 1e12;
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
 // TODO: maybe see if there are common factors (or something like that) on each side so we can make numbers smaller
@@ -26,7 +27,17 @@ pair<string,string> get_ref_coord_variable_names(int idx) {
 }
 
 PackingOutput optimal_algorithm(PackingInput input) {
-    ItemsContainer items = input.items.expand();
+    ItemsContainer items_original = input.items.expand();
+    ItemsContainer items = items_original;
+    auto container = input.container;
+    foe(e, container) {
+        e = {e.x() * scale, e.y() * scale};
+    }
+    foe(item, items) {
+        foe(p, item.pol) {
+            p = {p.x() * scale, p.y() * scale};
+        }
+    }
     cout << "Number of expanded items: " << sz(items) << endl;
     int binaries = 0;
     MIP problem;
@@ -50,6 +61,7 @@ PackingOutput optimal_algorithm(PackingInput input) {
             Point c2 = pol[(k+1) % sz(pol)];
             cerr << c1.x() << " " << c1.y() << endl;
             cerr << c2.x() << " " << c2.y() << endl;
+            auto o = offset;
             Vector v1 (c2.x() - c1.x(), c2.y() - c1.y());
             // v2 = (x - c1.x(), y - c1.y())
             // v1 cross v2 = v1.x() * (y - c1.y()) - v1.y() * (x - c1.x()) <= 0
@@ -60,10 +72,15 @@ PackingOutput optimal_algorithm(PackingInput input) {
             // v2 cross v1 = (x - c1.x()) * v1.y() - (y - c1.y()) * v1.x() <= 0
             // v2 cross v1 = x * v1.y() - c1.x() * v1.y() - y * v1.x() + c1.y() * v1.x() <= 0
             // v2 cross v1 = x * v1.y() - y * v1.x() <= c1.x() * v1.y() - c1.y() * v1.x()
+
+            // v2 = (x + o.x() - c1.x(), y + o.y() - c1.y())
+            // v1 cross v2 = v1.x() * (y + o.y() - c1.y()) - v1.y() * (x + o.x() - c1.x()) <= 0
+            // v1 cross v2 = v1.x() * y + v1.x() * o.y() - v1.x() * c1.y() - v1.y() * x - v1.y() * o.x() + v1.y() * c1.x() <= 0
+            // v1 cross v2 = v1.x() * y - v1.y() * x <= -v1.x() * o.y() + v1.x() * c1.y() + v1.y() * o.x() - v1.y() * c1.x()
             
             problem.add_geq_constraint(
                 {{y,v1.x()},{x,-v1.y()}, {binary,-biginf}},
-                v1.x() * c1.y() - v1.y() * c1.x() - biginf // TODO: safe in terms of casting??
+                -v1.x() * o.y() + v1.x() * c1.y() + v1.y() * o.x() - v1.y() * c1.x() - biginf // TODO: safe in terms of casting??
             );
         }
     };
@@ -132,7 +149,7 @@ PackingOutput optimal_algorithm(PackingInput input) {
                 foe(b, binvars) terms.push_back({b,1});
                 terms.push_back({in_use_binaries[i],-biginf});
                 terms.push_back({in_use_binaries[j],-biginf});
-                problem.add_geq_constraint(terms, 1 - 2 * biginf); // TODO: safe in terms of precision / automatic casting??
+                problem.add_geq_constraint(terms, 1ll - 2ll * biginf); // TODO: safe in terms of precision / automatic casting??
             }
         }
     }
@@ -140,18 +157,23 @@ PackingOutput optimal_algorithm(PackingInput input) {
         auto [x, y] = get_ref_coord_variable_names(i);
         auto ref = items[i].get_reference_point();
         foe(p, items[i].pol) {
-            add_constraints_inside_convex_polygon(input.container, x, y, in_use_binaries[i], p - ref);
+            add_constraints_inside_convex_polygon(container, x, y, in_use_binaries[i], p - ref);
         }
     }
     auto solution = problem.solve();
     PackingOutput output (input);
     fon(i, sz(items)) {
-        auto [xkey, ykey] = get_ref_coord_variable_names(i);
-        FT x = solution[xkey];
-        FT y = solution[ykey];
-        debug(x.to_double(),y.to_double());
-        Item new_item = items[i].move_ref_point(Point(x,y));
-        output.add_item(new_item);
+        if(solution[in_use_binaries[i]] > 0.5) {
+            auto [xkey, ykey] = get_ref_coord_variable_names(i);
+            debug(solution[xkey].to_double(), solution[ykey].to_double());
+            FT x = solution[xkey] / scale;
+            FT y = solution[ykey] / scale;
+            debug(x.to_double(),y.to_double());
+            debug(items_original[i].get_reference_point().x().to_double(), items_original[i].get_reference_point().y().to_double());
+            debug(items[i].get_reference_point().x().to_double(), items[i].get_reference_point().y().to_double());
+            Item new_item = items_original[i].move_ref_point(Point(x,y));
+            output.add_item(new_item);
+        }
     }
     return output;
 }
