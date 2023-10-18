@@ -9,6 +9,13 @@ if ( NOT CGAL_FOUND )
     return()  
 endif()
 
+find_package(SCIP QUIET)
+include(CGAL_SCIP_support)
+if(NOT TARGET CGAL::SCIP_support)
+    message(STATUS "NOTICE: This project requires SCIP and will not be compiled.")
+    return()
+endif()
+
 # Boost and its components
 find_package( Boost REQUIRED COMPONENTS system filesystem) 
 if ( NOT Boost_FOUND )
@@ -23,18 +30,20 @@ if( NOT OpenMP_CXX_FOUND)
 endif()
 
 include_directories(${Boost_INCLUDE_DIR})
-link_directories(${Boost_LIBRARY_DIR})
-
 include_directories(${CMAKE_SOURCE_DIR}/lib)
-
+include_directories(src/cpp)
 include_directories(../cgshop-lib)
+link_directories(${Boost_LIBRARY_DIR})
 link_directories(../cgshop-lib/out/build/lib)
 
+get_directory_property(_include_dirs INCLUDE_DIRECTORIES)
+message(STATUS "Include directories: ${_include_dirs}")
 get_directory_property(_link_dirs LINK_DIRECTORIES)
 message(STATUS "Link directories: ${_link_dirs}")
 
 # for LSP
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I$ENV{CGSHOP_LIB_PATH_HOST}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I$ENV{SRC_PATH_HOST}")
 # include_directories(${CGSHOP_LIB_PATH_HOST})
 
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
@@ -64,11 +73,18 @@ execute_process(COMMAND ./bin/getpybindsuffix.sh OUTPUT_VARIABLE pybind11_suffix
 add_library(dummy_algorithm SHARED src/cpp/algorithms/dummy.cpp)
 target_link_libraries(dummy_algorithm CGAL::CGAL)
 
+add_library(optimal_algorithm SHARED src/cpp/algorithms/optimal.cpp)
+target_link_libraries(optimal_algorithm CGAL::CGAL CGAL::SCIP_support)
+
+add_executable(mip_example src/cpp/lib2/mip_example.cpp)
+target_link_libraries(mip_example CGAL::CGAL CGAL::SCIP_support)
+
 # PY
 add_library(main${pybind11_suffix} SHARED src/cpp/main.cpp)
 target_link_libraries(
     main${pybind11_suffix}
     dummy_algorithm
+    optimal_algorithm
     com CGAL::CGAL
 )
 

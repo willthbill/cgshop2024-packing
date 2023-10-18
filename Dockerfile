@@ -7,7 +7,7 @@ WORKDIR /app
 RUN pacman -Syu --noconfirm
 
 # Install Python 3.10, pip, CGAL, and CMake
-RUN pacman -S --noconfirm cgal cmake git gcc boost make scons fzf direnv which tree vim vi neovim htop tk fontconfig ttf-dejavu
+RUN pacman -S --noconfirm cgal cmake git gcc boost make scons fzf direnv which tree vim vi neovim htop tk fontconfig ttf-dejavu fd scip tmux
 
 # Production
 #ARG UPDATE_LIB=false

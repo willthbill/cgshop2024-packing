@@ -12,3 +12,4 @@ print(f"  - number of items: {len(input_conf.items)}")
 output_conf = run_algorithm(input_conf)
 visualize(output_conf, show=True, preserve_coords=True)
 print(f"score: {output_conf.get_score()}")
+

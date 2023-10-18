@@ -27,8 +27,11 @@ class InputConfiguration(Configuration):
 
 class OutputConfiguration(Configuration):
 
-    def __init__(self, items, values, input_conf):
+    def __init__(self, indices, translations, items, input_conf):
+        values = [input_conf.values[idx] for idx in indices]
         super().__init__(input_conf.container, items, values)
+        self.translations = translations
+        self.indices = indices
         self.input_conf = input_conf
 
     def get_score(self):
