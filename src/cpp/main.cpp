@@ -46,6 +46,9 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorith
     vector<pii> _container,
     vector<tuple<int,int,vector<pii>>> _items
 ) {
+    cout << std::fixed;
+    cerr << std::fixed;
+
     PackingInput input = input2cgal(_container, _items);
     cout << "[c++] input information: " << endl;
     cout << "      number of items: " << sz(input.items) << endl;
@@ -58,6 +61,7 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorith
         auto score = val.get_score();
         ASSERT(score == res.get_score(),"scores do not match");
         cout << "[c++] score: " << score << endl;
+        cout << "[c++] number of items in solutions: " << sz(val) << endl;
     }
     return cgal2output(res);
 }

@@ -13,8 +13,8 @@
 
 using namespace std;
 
-const ll inf = 1e9;
-const ll biginf = 1e18;
+const ll inf = 1000;
+const ll biginf = 1e8;
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
 // TODO: maybe see if there are common factors (or something like that) on each side so we can make numbers smaller
@@ -27,6 +27,7 @@ pair<string,string> get_ref_coord_variable_names(int idx) {
 
 PackingOutput optimal_algorithm(PackingInput input) {
     ItemsContainer items = input.items.expand();
+    cout << "Number of expanded items: " << sz(items) << endl;
     int binaries = 0;
     MIP problem;
     vector<string> in_use_binaries;
@@ -42,7 +43,7 @@ PackingOutput optimal_algorithm(PackingInput input) {
         problem.add_continuous_variable(x);
         problem.add_continuous_variable(y);
     }
-    auto add_constraints_inside_convex_polygon = [&](Polygon& pol, string x, string y, string binary) {
+    auto add_constraints_inside_convex_polygon = [&](Polygon& pol, string x, string y, string binary, Vector offset) {
         ASSERT(pol.orientation() == CGAL::COUNTERCLOCKWISE, "must have counterclockwise orientation");
         fon(k, sz(pol)) {
             Point c1 = pol[k];
@@ -61,15 +62,15 @@ PackingOutput optimal_algorithm(PackingInput input) {
             // v2 cross v1 = x * v1.y() - y * v1.x() <= c1.x() * v1.y() - c1.y() * v1.x()
             
             problem.add_geq_constraint(
-                {{y,v1.x()},{x,-v1.y()}},//{binary,biginf}},
-                v1.x() * c1.y() - v1.y() * c1.x()// + biginf // TODO: safe in terms of casting??
+                {{y,v1.x()},{x,-v1.y()}, {binary,-biginf}},
+                v1.x() * c1.y() - v1.y() * c1.x() - biginf // TODO: safe in terms of casting??
             );
         }
     };
     fon(i, sz(items)) {
         fon(j, sz(items)) {
             if(i == j) continue;
-            continue;
+            // TODO: we dont need i,j and j,i right?
             debug("constraints for ",i,j);
             Polygon_set disallowed (items[j].pol);
             ConfigurationSpace cp (disallowed, items[i].pol, items[i].get_reference_point());
@@ -112,9 +113,16 @@ PackingOutput optimal_algorithm(PackingInput input) {
                         // v1.x() * y2 - v1.x() * y1 - v1.y() * x2 + v1.y() * x1 - (1 - b) * biginf <= v1.x() * c2.y() - v1.y() * c2.x()
                         // <=>
                         // v1.x() * y2 - v1.x() * y1 - v1.y() * x2 + v1.y() * x1 + b * biginf <= v1.x() * c2.y() - v1.y() * c2.x() + biginf
-                    problem.add_leq_constraint(
-                        {{y2, v1.x()},{y1,v1.x()},{x2,v1.y()},{x1,v1.y()},{b, biginf},{in_use_binaries[i],biginf},{in_use_binaries[j],biginf}},
-                        v1.x() * c2.y() - v1.y() * c2.x() + 3 * biginf // TODO: safe in terms of casting??
+                    
+                    // v2 = (x2 - x1 - c1.x(), y2 - y1 - c1.y());
+                    // Cross product
+                        // cross(v1,v2) = v1.x() * (y2 - y1 - c1.y()) - v1.y() * (x2 - x1 - c1.x())
+                        // = v1.x() * y2 - v1.x() * y1 - v1.x() * c1.y() - v1.y() * x2 + v1.y() * x1 + v1.y() * c1.x() <= 0   TODO: <= is correct right?
+                        // <=>
+                        // v1.x() * y2 - v1.x() * y1 - v1.y() * x2 + v1.y() * x1 <= v1.x() * c1.y() - v1.y() * c1.x()
+                    problem.add_geq_constraint(
+                        {{y2, v1.x()},{y1,-v1.x()},{x2,-v1.y()},{x1,v1.y()},{b, -biginf}, {in_use_binaries[i],-biginf},{in_use_binaries[j],-biginf}},
+                        v1.x() * c1.y() - v1.y() * c1.x() - 3ll * biginf // TODO: safe in terms of casting??
                     );
                 }
             }
@@ -122,15 +130,18 @@ PackingOutput optimal_algorithm(PackingInput input) {
             {
                 vector<pair<string,FT>> terms;
                 foe(b, binvars) terms.push_back({b,1});
-                terms.push_back({in_use_binaries[i],biginf});
-                terms.push_back({in_use_binaries[j],biginf});
-                problem.add_geq_constraint(terms, 1 + 2 * biginf); // TODO: safe in terms of precision / automatic casting??
+                terms.push_back({in_use_binaries[i],-biginf});
+                terms.push_back({in_use_binaries[j],-biginf});
+                problem.add_geq_constraint(terms, 1 - 2 * biginf); // TODO: safe in terms of precision / automatic casting??
             }
         }
     }
     fon(i, sz(items)) {
         auto [x, y] = get_ref_coord_variable_names(i);
-        add_constraints_inside_convex_polygon(input.container, x, y, in_use_binaries[i]);
+        auto ref = items[i].get_reference_point();
+        foe(p, items[i].pol) {
+            add_constraints_inside_convex_polygon(input.container, x, y, in_use_binaries[i], p - ref);
+        }
     }
     auto solution = problem.solve();
     PackingOutput output (input);

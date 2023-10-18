@@ -101,6 +101,12 @@ void MIP::set_min_objective(vector<pair<string,FT>> c) {
 }
 
 map<string,FT> MIP::solve() {
+    cout << "[c++] Solving MIP" << endl;
+    cout << "[c++] Number of variables: " << solver.number_of_variables() << endl;
+    cout << "[c++] Number of binary variables: " << solver.number_of_binary_variables() << endl;
+    cout << "[c++] Number of integer variables: " << solver.number_of_integer_variables() << endl;
+    cout << "[c++] Number of continuous variables: " << solver.number_of_continuous_variables() << endl;
+    cout << "[c++] Number of constraints: " << solver.number_of_constraints() << endl;
     if(!solver.solve()) {
         ASSERT(false,"solving MIP problem failed");
         return {};
