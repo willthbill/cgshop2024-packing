@@ -17,6 +17,7 @@ const ll inf = 1e9;
 const ll biginf = 1e18;
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
+// TODO: maybe see if there are common factors (or something like that) on each side so we can make numbers smaller
 
 pair<string,string> get_ref_coord_variable_names(int idx) {
     string x = "polygon_ref_" + to_string(idx) +  "_x";
@@ -49,19 +50,26 @@ PackingOutput optimal_algorithm(PackingInput input) {
             cerr << c1.x() << " " << c1.y() << endl;
             cerr << c2.x() << " " << c2.y() << endl;
             Vector v1 (c2.x() - c1.x(), c2.y() - c1.y());
-            // v2 = (x - c2.x(), y - c2.y())
-            // v1 cross v2 = v1.x() * (y - c2.y()) - v1.y() * (x - c2.x()) <= 0
-            // v1 cross v2 = v1.x() * y - v1.x() * c2.y() - v1.y() * x + v1.y() * c2.x() <= 0
-            // v1 cross v2 = v1.x() * y - v1.y() * x <= v1.x() * c2.y() - v1.y() * c2.x()
+            // v2 = (x - c1.x(), y - c1.y())
+            // v1 cross v2 = v1.x() * (y - c1.y()) - v1.y() * (x - c1.x()) <= 0
+            // v1 cross v2 = v1.x() * y - v1.x() * c1.y() - v1.y() * x + v1.y() * c1.x() <= 0
+            // v1 cross v2 = v1.x() * y - v1.y() * x <= v1.x() * c1.y() - v1.y() * c1.x()
+            
+            // v2 = (x - c1.x(), y - c1.y())
+            // v2 cross v1 = (x - c1.x()) * v1.y() - (y - c1.y()) * v1.x() <= 0
+            // v2 cross v1 = x * v1.y() - c1.x() * v1.y() - y * v1.x() + c1.y() * v1.x() <= 0
+            // v2 cross v1 = x * v1.y() - y * v1.x() <= c1.x() * v1.y() - c1.y() * v1.x()
+            
             problem.add_geq_constraint(
-                {{y,v1.x()},{x,v1.y()}},//{binary,biginf}},
-                v1.x() * c2.y() - v1.y() * c2.x()// + biginf // TODO: safe in terms of casting??
+                {{y,v1.x()},{x,-v1.y()}},//{binary,biginf}},
+                v1.x() * c1.y() - v1.y() * c1.x()// + biginf // TODO: safe in terms of casting??
             );
         }
     };
     fon(i, sz(items)) {
         fon(j, sz(items)) {
             if(i == j) continue;
+            continue;
             debug("constraints for ",i,j);
             Polygon_set disallowed (items[j].pol);
             ConfigurationSpace cp (disallowed, items[i].pol, items[i].get_reference_point());

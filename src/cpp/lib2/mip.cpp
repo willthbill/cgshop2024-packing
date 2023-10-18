@@ -16,7 +16,14 @@ void MIP::_add_constraint(vector<pair<string,FT>> a, FT b, string type) {
     foe(p, a) {
         ASSERT(vars.count(p.fi) == 1, "variable " << p.fi << " was not created");
     }
-    debug(b.to_double());
+    cout << "[c++] Adding constraint" << endl;
+    fon(i, sz(a)) {
+        cout << "   " << a[i].fi << " * " << a[i].se.to_double();
+        if(i < sz(a) - 1) cout << " +";
+        cout << endl;
+    }
+    cout << "   " << type << " " << b.to_double() << endl;
+    cout << "[c++] End of constraint" << endl;
     Linear_constraint* c;
     if(type == "eq") {
         c = solver.create_constraint(b.to_double(), b.to_double(), get_constraint_name());
