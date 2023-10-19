@@ -13,12 +13,14 @@
 
 using namespace std;
 
-const double scale=1;
-const ll inf = 1e3;
-const ll biginf = 1e8;
+const double scale=0.05;
+const double inf = 500 * scale;
+const double biginf = 1e4 * scale;
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
 // TODO: maybe see if there are common factors (or something like that) on each side so we can make numbers smaller
+// TODO: optimize by drawing triangle around instead of square
+// TODO: actually calculate bounds (inf, biginf)
 
 pair<string,string> get_ref_coord_variable_names(int idx) {
     string x = "polygon_ref_" + to_string(idx) +  "_x";
@@ -26,10 +28,10 @@ pair<string,string> get_ref_coord_variable_names(int idx) {
     return {x,y};
 }
 
-PackingOutput optimal_algorithm(PackingInput input) {
-    ItemsContainer items_original = input.items.expand();
-    ItemsContainer items = items_original;
-    auto container = input.container;
+PackingOutput optimal_algorithm(PackingInput input123) {
+    ItemsContainer items_original123 = input123.items.expand();
+    ItemsContainer items = items_original123;
+    auto container = input123.container;
     foe(e, container) {
         e = {e.x() * scale, e.y() * scale};
     }
@@ -86,7 +88,7 @@ PackingOutput optimal_algorithm(PackingInput input) {
     };
     fon(i, sz(items)) {
         fon(j, sz(items)) {
-            if(i == j) continue;
+            if(i >= j) continue;
             // TODO: we dont need i,j and j,i right?
             debug("constraints for ",i,j);
             Polygon_set disallowed (items[j].pol);
@@ -139,7 +141,7 @@ PackingOutput optimal_algorithm(PackingInput input) {
                         // v1.x() * y2 - v1.x() * y1 - v1.y() * x2 + v1.y() * x1 <= v1.x() * c1.y() - v1.y() * c1.x()
                     problem.add_geq_constraint(
                         {{y2, v1.x()},{y1,-v1.x()},{x2,-v1.y()},{x1,v1.y()},{b, -biginf}, {in_use_binaries[i],-biginf},{in_use_binaries[j],-biginf}},
-                        v1.x() * c1.y() - v1.y() * c1.x() - 3ll * biginf // TODO: safe in terms of casting??
+                        v1.x() * c1.y() - v1.y() * c1.x() - 3.0 * biginf // TODO: safe in terms of casting??
                     );
                 }
             }
@@ -147,9 +149,9 @@ PackingOutput optimal_algorithm(PackingInput input) {
             {
                 vector<pair<string,FT>> terms;
                 foe(b, binvars) terms.push_back({b,1});
-                terms.push_back({in_use_binaries[i],-biginf});
-                terms.push_back({in_use_binaries[j],-biginf});
-                problem.add_geq_constraint(terms, 1ll - 2ll * biginf); // TODO: safe in terms of precision / automatic casting??
+                terms.push_back({in_use_binaries[i],-100});
+                terms.push_back({in_use_binaries[j],-100});
+                problem.add_geq_constraint(terms, 1ll - 200); // TODO: safe in terms of precision / automatic casting??
             }
         }
     }
@@ -161,7 +163,7 @@ PackingOutput optimal_algorithm(PackingInput input) {
         }
     }
     auto solution = problem.solve();
-    PackingOutput output (input);
+    PackingOutput output (input123);
     fon(i, sz(items)) {
         if(solution[in_use_binaries[i]] > 0.5) {
             auto [xkey, ykey] = get_ref_coord_variable_names(i);
@@ -169,9 +171,9 @@ PackingOutput optimal_algorithm(PackingInput input) {
             FT x = solution[xkey] / scale;
             FT y = solution[ykey] / scale;
             debug(x.to_double(),y.to_double());
-            debug(items_original[i].get_reference_point().x().to_double(), items_original[i].get_reference_point().y().to_double());
+            debug(items_original123[i].get_reference_point().x().to_double(), items_original123[i].get_reference_point().y().to_double());
             debug(items[i].get_reference_point().x().to_double(), items[i].get_reference_point().y().to_double());
-            Item new_item = items_original[i].move_ref_point(Point(x,y));
+            Item new_item = items_original123[i].move_ref_point(Point(x,y));
             output.add_item(new_item);
         }
     }
