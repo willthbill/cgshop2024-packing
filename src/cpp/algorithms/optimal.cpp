@@ -14,8 +14,8 @@
 using namespace std;
 
 const ll scale=1;
-const ll inf = 2e9;
-const ll biginf = 2e18;
+const ll inf = 5000;
+const ll biginf = 1e7;
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
 // TODO: maybe see if there are common factors (or something like that) on each side so we can make numbers smaller
@@ -108,6 +108,7 @@ PackingOutput optimal_algorithm(PackingInput input123) {
                 assert(polygon.number_of_holes() == 1);
                 PartitionConstructor pc (polygon);
                 partition = pc.get_constrained_delaunay_triangulation();
+                // partition = pc.get_approx_convex_partition();
             }
             Point ref = items[j].get_reference_point(); // (x1,y1)
             // Point centroid = get_centroid(get<1>(items[i])); // (x2,y2)

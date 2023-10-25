@@ -70,9 +70,9 @@ void Gurobi_MIP::_add_variable(string name, string type) {
     if(type == "con") {
         vars[name] = solver.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, name);
     } else if(type == "bin") {
-        vars[name] = solver.addVar(0, 1, 0, GRB_BINARY, name);
+        vars[name] = solver.addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
     } else if (type == "int") {
-        vars[name] = solver.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_INTEGER, name);
+        vars[name] = solver.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_INTEGER, name);
     } else {
         ASSERT(false, "unknown variable type " << type);
     }
@@ -143,7 +143,7 @@ map<string,FT> Gurobi_MIP::solve() {
 
     get_status(solver);
 
-    solver.set(GRB_DoubleParam_Cutoff, 100);
+    // solver.set(GRB_DoubleParam_Cutoff, 100);
     solver.set(GRB_DoubleParam_MIPGap, 0.1);
     solver.set(GRB_IntParam_MIPFocus, 1);
     solver.optimize();
