@@ -9,6 +9,8 @@ if ( NOT CGAL_FOUND )
     return()  
 endif()
 
+message(STATUS "CXX ${CXX}")
+
 find_package(SCIP QUIET)
 include(CGAL_SCIP_support)
 if(NOT TARGET CGAL::SCIP_support)
@@ -29,10 +31,18 @@ if( NOT OpenMP_CXX_FOUND)
     return()
 endif()
 
+set(CXX 1) # C++ libs for gurobi
+find_package(GUROBI REQUIRED)
+if (NOT GUROBI_CXX_LIBRARY OR NOT GUROBI_LIBRARY)
+    message(STATUS "This project requires Gurobi, and will not be compiled")
+endif()
+
+
 include_directories(${Boost_INCLUDE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/lib)
 include_directories(src/cpp)
 include_directories(../cgshop-lib)
+include_directories(${GUROBI_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIR})
 link_directories(../cgshop-lib/out/build/lib)
 
@@ -84,18 +94,27 @@ target_link_libraries(io ${CGALLIB} util geometry_utils)
 add_library(configuration_space SHARED src/cpp/lib2/configuration_space.cpp)
 target_link_libraries(configuration_space ${CGALLIB} geometry_utils)
 
-add_library(mip SHARED src/cpp/lib2/mip.cpp)
-target_link_libraries(mip ${CGALLIB} geometry_utils)
+add_library(mip SHARED src/cpp/lib2/mip/mip.cpp)
+target_link_libraries(mip ${CGALLIB})
+
+add_library(scip_mip SHARED src/cpp/lib2/mip/scip.cpp)
+target_link_libraries(scip_mip ${CGALLIB} geometry_utils mip)
+
+add_library(gurobi_mip SHARED src/cpp/lib2/mip/gurobi.cpp)
+target_link_libraries(gurobi_mip ${CGALLIB} mip ${GUROBI_CXX_LIBRARY} ${GUROBI_LIBRARY})
 
 ### algorithms ###
 #add_library(dummy_algorithm SHARED src/cpp/algorithms/dummy.cpp)
 #target_link_libraries(dummy_algorithm CGAL::CGAL util)
 
 add_library(optimal_algorithm SHARED src/cpp/algorithms/optimal.cpp)
-target_link_libraries(optimal_algorithm ${CGALLIB} partition_constructor mip configuration_space geometry_utils io)
+target_link_libraries(optimal_algorithm ${CGALLIB} partition_constructor scip_mip gurobi_mip configuration_space geometry_utils io)
 
 #add_executable(mip_example src/cpp/lib2/mip_example.cpp)
 #target_link_libraries(mip_example CGAL::CGAL CGAL::SCIP_support)
+
+add_executable(gurobi_example src/cpp/lib2/mip/gurobi_example.cpp)
+target_link_libraries(gurobi_example ${GUROBI_CXX_LIBRARY} ${GUROBI_LIBRARY})
 
 ###### PY ######
 add_library(main${pybind11_suffix} SHARED src/cpp/main.cpp)

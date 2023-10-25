@@ -1,7 +1,7 @@
 #include <bits/stdc++.h>
 #include <CGAL/minkowski_sum_2.h>
 
-#include "configuration_space.h"
+#include "lib2/configuration_space.h"
 
 #include "lib/util/geometry_utils.h"
 #include "lib/util/cgal.h"

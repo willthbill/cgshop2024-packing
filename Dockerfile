@@ -1,5 +1,6 @@
 # Use the latest Arch Linux base image
-FROM archlinux
+# FROM archlinux
+FROM greyltc/archlinux-aur:yay
 
 WORKDIR /app
 
@@ -8,6 +9,9 @@ RUN pacman -Syu --noconfirm
 
 # Install Python 3.10, pip, CGAL, and CMake
 RUN pacman -S --noconfirm cgal cmake git gcc boost make scons fzf direnv which tree vim vi neovim htop tk fontconfig ttf-dejavu fd scip tmux
+
+# Install aur packages
+RUN aur-install gurobi
 
 # Production
 #ARG UPDATE_LIB=false
@@ -18,6 +22,7 @@ RUN pacman -S --noconfirm cgal cmake git gcc boost make scons fzf direnv which t
 #RUN ./scripts/build
 #WORKDIR /app
 
+USER root
 WORKDIR /app
 RUN python -m venv venv
 ENV PATH="venv/bin:$PATH"

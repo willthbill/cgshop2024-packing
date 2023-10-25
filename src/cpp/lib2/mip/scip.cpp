@@ -1,6 +1,6 @@
 #include <bits/stdc++.h>
 
-#include "mip.h"
+#include "lib2/mip/scip.h"
 
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
@@ -8,11 +8,9 @@
 
 using namespace std;
 
-string MIP::get_constraint_name() {
-    return "c_" + to_string(constraint_name++);
-}
+SCIP_MIP::~SCIP_MIP(){}
 
-void MIP::_add_constraint(vector<pair<string,FT>> a, FT b, string type) {
+void SCIP_MIP::_add_constraint(vector<pair<string,FT>> a, FT b, string type) {
     foe(p, a) {
         ASSERT(vars.count(p.fi) == 1, "variable " << p.fi << " was not created");
     }
@@ -39,7 +37,7 @@ void MIP::_add_constraint(vector<pair<string,FT>> a, FT b, string type) {
     }
 }
 
-void MIP::_add_variable(string name, string type) {
+void SCIP_MIP::_add_variable(string name, string type) {
     ASSERT(vars.count(name) == 0, "variable " << name << " already exists");
     cout << "[c++] Adding variable " << name << " of type " << type << endl;
     Variable* x;
@@ -48,6 +46,8 @@ void MIP::_add_variable(string name, string type) {
     } else if(type == "bin") {
         x = solver.create_variable(Variable::BINARY);
         x->set_name(name);
+    } else if (type == "int") {
+        x = solver.create_variable(Variable::INTEGER, -Variable::infinity(), Variable::infinity(), name);
     } else {
         ASSERT(false, "unknown variable type " << type);
     }
@@ -55,7 +55,7 @@ void MIP::_add_variable(string name, string type) {
     vars_order.push_back(name);
 }
 
-void MIP::_set_objective(string type, vector<pair<string,FT>> c) {
+void SCIP_MIP::_set_objective(string type, vector<pair<string,FT>> c) {
     foe(p, c) {
         ASSERT(vars.count(p.fi) == 1, "variable " << p.fi << " was not created");
     }
@@ -72,35 +72,7 @@ void MIP::_set_objective(string type, vector<pair<string,FT>> c) {
     }
 }
 
-void MIP::add_eq_constraint(vector<pair<string,FT>> a, FT b) {
-    _add_constraint(a,b,"eq");
-}
-
-void MIP::add_leq_constraint(vector<pair<string,FT>> a, FT b) {
-    _add_constraint(a,b,"leq");
-}
-
-void MIP::add_geq_constraint(vector<pair<string,FT>> a, FT b) {
-    _add_constraint(a,b,"geq");
-}
-
-void MIP::add_binary_variable(string name) {
-    _add_variable(name, "bin");
-}
-
-void MIP::add_continuous_variable(string name) {
-    _add_variable(name, "con");
-}
-
-void MIP::set_max_objective(vector<pair<string,FT>> c) {
-    _set_objective("max", c);
-}
-
-void MIP::set_min_objective(vector<pair<string,FT>> c) {
-    _set_objective("min", c);
-}
-
-map<string,FT> MIP::solve() {
+map<string,FT> SCIP_MIP::solve() {
     cout << "[c++] Solving MIP" << endl;
     cout << "[c++] Number of variables: " << solver.number_of_variables() << endl;
     cout << "[c++] Number of binary variables: " << solver.number_of_binary_variables() << endl;
@@ -121,3 +93,4 @@ map<string,FT> MIP::solve() {
     }
     return res;
 }
+

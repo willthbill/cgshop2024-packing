@@ -3,7 +3,7 @@
 #include <CGAL/Boolean_set_operations_2.h>
 
 #include "lib2/configuration_space.h"
-#include "lib2/mip.h"
+#include "lib2/mip/gurobi.h"
 #include "io.h"
 #include "lib/geometry/partition_constructor.h"
 #include "lib/util/geometry_utils.h"
@@ -13,9 +13,9 @@
 
 using namespace std;
 
-const double scale=0.05;
-const double inf = 500 * scale;
-const double biginf = 1e4 * scale;
+const ll scale=1;
+const ll inf = 5000;
+const ll biginf = 1e7;
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
 // TODO: maybe see if there are common factors (or something like that) on each side so we can make numbers smaller
@@ -29,6 +29,7 @@ pair<string,string> get_ref_coord_variable_names(int idx) {
 }
 
 PackingOutput optimal_algorithm(PackingInput input123) {
+    cout << "RUNNING OPTIMAL ALGORITHM" << endl;
     ItemsContainer items_original123 = input123.items.expand();
     ItemsContainer items = items_original123;
     auto container = input123.container;
@@ -42,7 +43,8 @@ PackingOutput optimal_algorithm(PackingInput input123) {
     }
     cout << "Number of expanded items: " << sz(items) << endl;
     int binaries = 0;
-    MIP problem;
+    Gurobi_MIP problem;
+    cout << "YO ther" << endl;
     vector<string> in_use_binaries;
     vector<pair<string,FT>> obj_terms;
     fon(i, sz(items)) {
@@ -53,8 +55,8 @@ PackingOutput optimal_algorithm(PackingInput input123) {
     problem.set_max_objective(obj_terms);
     fon(i, sz(items)) {
         auto [x, y] = get_ref_coord_variable_names(i);
-        problem.add_continuous_variable(x);
-        problem.add_continuous_variable(y);
+        problem.add_integer_variable(x);
+        problem.add_integer_variable(y);
     }
     auto add_constraints_inside_convex_polygon = [&](Polygon& pol, string x, string y, string binary, Vector offset) {
         ASSERT(pol.orientation() == CGAL::COUNTERCLOCKWISE, "must have counterclockwise orientation");
@@ -141,7 +143,7 @@ PackingOutput optimal_algorithm(PackingInput input123) {
                         // v1.x() * y2 - v1.x() * y1 - v1.y() * x2 + v1.y() * x1 <= v1.x() * c1.y() - v1.y() * c1.x()
                     problem.add_geq_constraint(
                         {{y2, v1.x()},{y1,-v1.x()},{x2,-v1.y()},{x1,v1.y()},{b, -biginf}, {in_use_binaries[i],-biginf},{in_use_binaries[j],-biginf}},
-                        v1.x() * c1.y() - v1.y() * c1.x() - 3.0 * biginf // TODO: safe in terms of casting??
+                        v1.x() * c1.y() - v1.y() * c1.x() - 3 * biginf // TODO: safe in terms of casting??
                     );
                 }
             }

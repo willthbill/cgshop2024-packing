@@ -9,6 +9,7 @@ docker run \
     -v "$CGSHOP_LIB_PATH_HOST":/app/cgshop-lib \
     -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
     -v ./.bash_history:/root/.bash_history \
+    --ulimit nofile=1024:10240 \
     --env-file ./env.list \
     -it max-polygon-packing
 

@@ -1,0 +1,5 @@
+/home/will/projects/max-polygon-packing/minimalexample/CMakeFiles/A.dir
+/home/will/projects/max-polygon-packing/minimalexample/CMakeFiles/B.dir
+/home/will/projects/max-polygon-packing/minimalexample/CMakeFiles/MyApp.dir
+/home/will/projects/max-polygon-packing/minimalexample/CMakeFiles/edit_cache.dir
+/home/will/projects/max-polygon-packing/minimalexample/CMakeFiles/rebuild_cache.dir

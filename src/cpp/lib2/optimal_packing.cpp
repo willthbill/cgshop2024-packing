@@ -3,8 +3,8 @@
 #include <CGAL/Boolean_set_operations_2.h>
 
 #include "lib2/configuration_space.h"
-#include "lib2/mip.h"
-#include "util.cpp"
+#include "lib2/mip/mip.h"
+#include "lib2/util.h"
 #include "lib/geometry/partition_constructor.h"
 #include "lib/util/geometry_utils.h"
 #include "lib/util/cgal.h"
