@@ -6,14 +6,14 @@
 #include "lib2/mip/mip.h"
 #include "lib/util/cgal.h"
 
+GRBEnv& get_env();
+
 class Gurobi_MIP: public MIP {
 
 public:
 
     GRBModel solver;
-    GRBEnv env;
     std::map<std::string,GRBVar> vars;
-    std::vector<std::string> vars_order;
 
     Gurobi_MIP();
 

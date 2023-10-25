@@ -14,8 +14,8 @@
 using namespace std;
 
 const ll scale=1;
-const ll inf = 5000;
-const ll biginf = 1e7;
+const ll inf = 2e9;
+const ll biginf = 2e18;
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
 // TODO: maybe see if there are common factors (or something like that) on each side so we can make numbers smaller
@@ -52,6 +52,7 @@ PackingOutput optimal_algorithm(PackingInput input123) {
         problem.add_binary_variable(in_use_binaries[i]);
         obj_terms.push_back({in_use_binaries[i], items[i].value});
     }
+    debug(obj_terms);
     problem.set_max_objective(obj_terms);
     fon(i, sz(items)) {
         auto [x, y] = get_ref_coord_variable_names(i);
@@ -153,7 +154,7 @@ PackingOutput optimal_algorithm(PackingInput input123) {
                 foe(b, binvars) terms.push_back({b,1});
                 terms.push_back({in_use_binaries[i],-100});
                 terms.push_back({in_use_binaries[j],-100});
-                problem.add_eq_constraint(terms, 1ll - 200); // TODO: safe in terms of precision / automatic casting??
+                problem.add_geq_constraint(terms, 1ll - 200); // TODO: safe in terms of precision / automatic casting??
             }
         }
     }
