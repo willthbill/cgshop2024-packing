@@ -151,7 +151,7 @@ PackingOutput optimal_algorithm(PackingInput input123) {
                 foe(b, binvars) terms.push_back({b,1});
                 terms.push_back({in_use_binaries[i],-100});
                 terms.push_back({in_use_binaries[j],-100});
-                problem.add_geq_constraint(terms, 1ll - 200); // TODO: safe in terms of precision / automatic casting??
+                problem.add_eq_constraint(terms, 1ll - 200); // TODO: safe in terms of precision / automatic casting??
             }
         }
     }
