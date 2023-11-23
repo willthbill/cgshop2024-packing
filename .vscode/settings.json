@@ -1,0 +1,7 @@
+{
+    "C_Cpp.default.compileCommands": "compile_commands.json",
+    "C_Cpp.intelliSenseEngine": "Tag Parser",
+    "files.associations": {
+        "vector": "cpp"
+    }
+}

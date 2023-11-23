@@ -36,9 +36,9 @@ def visualize(conf, show=True, out_file=None, preserve_coords=False):
     fig, ax = plt.subplots()
 
     container = conf.container.get_approx_representation()
-    print(container)
+    print("[py] container: ", container)
     items = [item.get_approx_representation() for item in conf.items]
-    print(items)
+    for item in items: print("[py] item:", item)
 
     min_value=conf.get_min_value()
     max_value=conf.get_max_value()

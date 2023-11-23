@@ -2,16 +2,17 @@
 # FROM archlinux
 FROM greyltc/archlinux-aur:yay
 
-WORKDIR /app
 
 # Update the package database and upgrade the system
 RUN pacman -Syu --noconfirm
 
 # Install Python 3.10, pip, CGAL, and CMake
-RUN pacman -S --noconfirm cgal cmake git gcc boost make scons fzf direnv which tree vim vi neovim htop tk fontconfig ttf-dejavu fd scip tmux
+RUN pacman -S --noconfirm cgal cmake git gcc boost make scons fzf direnv which tree vim vi neovim htop tk fontconfig ttf-dejavu fd scip tmux gdb
 
 # Install aur packages
 RUN aur-install gurobi
+
+RUN pacman -Syu --noconfirm sudo
 
 # Production
 #ARG UPDATE_LIB=false
@@ -22,16 +23,26 @@ RUN aur-install gurobi
 #RUN ./scripts/build
 #WORKDIR /app
 
-USER root
+RUN groupadd -g 1000 mygroup && \
+    useradd -m -u 1000 -g 1000 -s /bin/bash myuser
+RUN usermod -aG wheel myuser
+RUN sed -i 's/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN cat /etc/sudoers
+
 WORKDIR /app
+RUN mkdir -p /opt/gurobi
+RUN cp ./licenses/gurobi.lic /opt/gurobi
+RUN chown -R myuser:mygroup /app
+USER myuser
 RUN python -m venv venv
 ENV PATH="venv/bin:$PATH"
 RUN pip install --no-cache-dir matplotlib numpy pybind11
 
-COPY .bashrc /root/
+COPY .bashrc /home/myuser/
 
-RUN echo 'source /root/.bashrc' >> /root/.profile
-RUN echo 'source /root/.bashrc' >> /root/.bash_profile
+RUN echo 'source /home/myuser/.bashrc' >> ~/.profile
+RUN echo 'source /home/myuser/.bashrc' >> ~/.bash_profile
 
 # Set the default command for the container
 WORKDIR /app/max-polygon-packing

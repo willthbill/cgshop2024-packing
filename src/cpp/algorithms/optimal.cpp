@@ -2,11 +2,14 @@
 #include <CGAL/Aff_transformation_2.h>
 #include <CGAL/Boolean_set_operations_2.h>
 
+#include "lib2/snap.h"
 #include "lib2/configuration_space.h"
+#include "lib2/util.h"
 #include "lib2/mip/gurobi.h"
 #include "io.h"
 #include "lib/geometry/partition_constructor.h"
 #include "lib/util/geometry_utils.h"
+
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
 #include "lib/util/debug.h"
@@ -29,7 +32,7 @@ pair<string,string> get_ref_coord_variable_names(int idx) {
 }
 
 PackingOutput optimal_algorithm(PackingInput input123) {
-    cout << "RUNNING OPTIMAL ALGORITHM" << endl;
+    cout << "[c++] RUNNING OPTIMAL ALGORITHM" << endl;
     ItemsContainer items_original123 = input123.items.expand();
     ItemsContainer items = items_original123;
     auto container = input123.container;
@@ -41,10 +44,9 @@ PackingOutput optimal_algorithm(PackingInput input123) {
             p = {p.x() * scale, p.y() * scale};
         }
     }
-    cout << "Number of expanded items: " << sz(items) << endl;
+    cout << "[c++] Number of expanded items: " << sz(items) << endl;
     int binaries = 0;
     Gurobi_MIP problem;
-    cout << "YO ther" << endl;
     vector<string> in_use_binaries;
     vector<pair<string,FT>> obj_terms;
     fon(i, sz(items)) {
@@ -52,7 +54,6 @@ PackingOutput optimal_algorithm(PackingInput input123) {
         problem.add_binary_variable(in_use_binaries[i]);
         obj_terms.push_back({in_use_binaries[i], items[i].value});
     }
-    debug(obj_terms);
     problem.set_max_objective(obj_terms);
     fon(i, sz(items)) {
         auto [x, y] = get_ref_coord_variable_names(i);
@@ -64,8 +65,6 @@ PackingOutput optimal_algorithm(PackingInput input123) {
         fon(k, sz(pol)) {
             Point c1 = pol[k];
             Point c2 = pol[(k+1) % sz(pol)];
-            cerr << c1.x() << " " << c1.y() << endl;
-            cerr << c2.x() << " " << c2.y() << endl;
             auto o = offset;
             Vector v1 (c2.x() - c1.x(), c2.y() - c1.y());
             // v2 = (x - c1.x(), y - c1.y())
@@ -93,21 +92,37 @@ PackingOutput optimal_algorithm(PackingInput input123) {
         fon(j, sz(items)) {
             if(i >= j) continue;
             // TODO: we dont need i,j and j,i right?
-            debug("constraints for ",i,j);
-            Polygon_set disallowed (items[j].pol);
-            ConfigurationSpace cp (disallowed, items[i].pol, items[i].get_reference_point());
             vector<Polygon> partition;
             {
+                // Compute configuration space
+                Polygon_set disallowed (items[j].pol);
+                ConfigurationSpace cp (disallowed, items[i].pol, items[i].get_reference_point());
+                // Snap it to a grid
+                SnapToGrid snapper (get_complement(cp.space)); // TODO: taking complement twice
+                // Computer intersection of square and completement of configuration space
                 Polygon square; square.pb(Point(-inf,-inf));square.pb(Point(inf,-inf));square.pb(Point(inf,inf));square.pb(Point(-inf,inf));
                 Polygon_set ps (square);
-                ps.intersection(cp.space);
+                ps.intersection(get_complement(snapper.space));
+                // Get the single polygon with one hole (the complement of conf space)
                 auto polygons = to_polygon_vector(ps);
                 assert(sz(polygons) == 1);
                 auto polygon = polygons[0];
-                debug(polygon.number_of_holes());
                 assert(polygon.number_of_holes() == 1);
+                // Compute convex cover (triangulation, partiton or something)
                 PartitionConstructor pc (polygon);
+                foe(hole, polygon.holes()) {
+                    foe(p, hole) {
+                        ASSERT(is_integer(p.x()), "configuration space coord should be an integer");
+                        ASSERT(is_integer(p.y()), "configuration space coord should be an integer");
+                    }
+                }
                 partition = pc.get_constrained_delaunay_triangulation();
+                foe(tri, partition) {
+                    foe(p, tri) {
+                        ASSERT(is_integer(p.x()), "configuration space partition coord should be an integer");
+                        ASSERT(is_integer(p.y()), "configuration space partition coord should be an integer");
+                    }
+                }
                 // partition = pc.get_approx_convex_partition();
             }
             Point ref = items[j].get_reference_point(); // (x1,y1)
@@ -145,7 +160,7 @@ PackingOutput optimal_algorithm(PackingInput input123) {
                         // v1.x() * y2 - v1.x() * y1 - v1.y() * x2 + v1.y() * x1 <= v1.x() * c1.y() - v1.y() * c1.x()
                     problem.add_geq_constraint(
                         {{y2, v1.x()},{y1,-v1.x()},{x2,-v1.y()},{x1,v1.y()},{b, -biginf}, {in_use_binaries[i],-biginf},{in_use_binaries[j],-biginf}},
-                        v1.x() * c1.y() - v1.y() * c1.x() - 3 * biginf // TODO: safe in terms of casting??
+                        v1.x() * c1.y() - v1.y() * c1.x() - ((long long)3) * biginf // TODO: safe in terms of casting??
                     );
                 }
             }
@@ -171,12 +186,13 @@ PackingOutput optimal_algorithm(PackingInput input123) {
     fon(i, sz(items)) {
         if(solution[in_use_binaries[i]] > 0.5) {
             auto [xkey, ykey] = get_ref_coord_variable_names(i);
-            debug(solution[xkey].to_double(), solution[ykey].to_double());
+            // debug(solution[xkey].to_double(), solution[ykey].to_double());
             FT x = solution[xkey] / scale;
             FT y = solution[ykey] / scale;
-            debug(x.to_double(),y.to_double());
-            debug(items_original123[i].get_reference_point().x().to_double(), items_original123[i].get_reference_point().y().to_double());
-            debug(items[i].get_reference_point().x().to_double(), items[i].get_reference_point().y().to_double());
+            cout << "[c++] Item coordinates: " << x << " " << y << endl;
+            // debug(x.to_double(),y.to_double());
+            // debug(items_original123[i].get_reference_point().x().to_double(), items_original123[i].get_reference_point().y().to_double());
+            // debug(items[i].get_reference_point().x().to_double(), items[i].get_reference_point().y().to_double());
             Item new_item = items_original123[i].move_ref_point(Point(x,y));
             output.add_item(new_item);
         }

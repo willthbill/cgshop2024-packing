@@ -3,6 +3,7 @@
 #include "lib2/mip/gurobi.h"
 
 #include "lib/util/cgal.h"
+#include "lib/util/geometry_utils.h"
 #include "lib/util/common.h"
 #include "lib/util/debug.h"
 
@@ -23,17 +24,27 @@ GRBEnv& get_env() {
 Gurobi_MIP::~Gurobi_MIP(){}
 
 Gurobi_MIP::Gurobi_MIP() : solver(get_env()) {
-    cout << "CONSTRUCTOR CALLED" << endl;
 }
 
 void get_status(GRBModel& solver) {
     std::cout << "[c++] Solving MIP" << std::endl;
-    cout << solver.get(GRB_IntAttr_NumVars) << endl;
     std::cout << "[c++] Number of variables: " << solver.get(GRB_IntAttr_NumVars) << std::endl;
     std::cout << "[c++] Number of binary variables: " << solver.get(GRB_IntAttr_NumBinVars) << std::endl;
     std::cout << "[c++] Number of integer variables: " << solver.get(GRB_IntAttr_NumIntVars) - solver.get(GRB_IntAttr_NumBinVars) << std::endl;
     std::cout << "[c++] Number of continuous variables: " << solver.get(GRB_IntAttr_NumVars) - solver.get(GRB_IntAttr_NumIntVars) << std::endl;
     std::cout << "[c++] Number of constraints: " << solver.get(GRB_IntAttr_NumConstrs) << std::endl;
+}
+
+ll get_ll(FT v) {
+    string fraction = decompose_fraction(v);
+    std::istringstream iss(fraction);
+    std::string part;
+    ASSERT(std::getline(iss, part, '/'), "v is not a fraction");
+    ll numerator = std::stoll(part);
+    ASSERT(std::getline(iss, part), "denominator problem");
+    ll denominator = std::stoll(part);
+    ASSERT(denominator == 1, "denominator must be 1");
+    return numerator;
 }
 
 void Gurobi_MIP::_add_constraint(vector<pair<string,FT>> a, FT b, string type) {
@@ -42,41 +53,42 @@ void Gurobi_MIP::_add_constraint(vector<pair<string,FT>> a, FT b, string type) {
     }
     cout << "[c++] Adding constraint" << endl;
     fon(i, sz(a)) {
-        cout << "   " << a[i].fi << " * " << a[i].se.to_double();
+        cout << "   " << a[i].fi << " * " << get_ll(a[i].se);
         if(i < sz(a) - 1) cout << " +";
         cout << endl;
     }
-    cout << "   " << type << " " << b.to_double() << endl;
+    cout << "   " << type << " " << get_ll(b) << endl;
     cout << "[c++] End of constraint" << endl;
     GRBLinExpr expr = 0;
     foe(p, a) {
-        expr += vars[p.fi] * p.se.to_double();
+        expr += vars[p.fi] * get_ll(p.se);
     }
     if(type == "eq") {
-        solver.addConstr(expr == b.to_double(), get_constraint_name());
+        solver.addConstr(expr == get_ll(b), get_constraint_name());
     } else if(type == "leq") {
-        solver.addConstr(expr <= b.to_double(), get_constraint_name());
+        solver.addConstr(expr <= get_ll(b), get_constraint_name());
     } else if(type == "geq") {
-        solver.addConstr(expr >= b.to_double(), get_constraint_name());
+        solver.addConstr(expr >= get_ll(b), get_constraint_name());
     } else {
         ASSERT(false, "unknown constraint type " << type);
     }
-    get_status(solver);
+    // get_status(solver);
 }
 
 void Gurobi_MIP::_add_variable(string name, string type) {
     ASSERT(vars.count(name) == 0, "variable " << name << " already exists");
     cout << "[c++] Adding variable " << name << " of type " << type << endl;
     if(type == "con") {
+        ASSERT(false, "cannot use continous vairable right now");
         vars[name] = solver.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, name);
     } else if(type == "bin") {
-        vars[name] = solver.addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
+        vars[name] = solver.addVar(0, 1, 0, GRB_BINARY, name);
     } else if (type == "int") {
-        vars[name] = solver.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_INTEGER, name);
+        vars[name] = solver.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_INTEGER, name);
     } else {
         ASSERT(false, "unknown variable type " << type);
     }
-    get_status(solver);
+    // get_status(solver);
 }
 
 void Gurobi_MIP::_set_objective(string type, vector<pair<string,FT>> c) {
@@ -85,18 +97,18 @@ void Gurobi_MIP::_set_objective(string type, vector<pair<string,FT>> c) {
     }
     GRBLinExpr expr = 0;
     foe(p, c) {
-        expr += vars[p.fi] * p.se.to_double();
-        debug(p.se.to_double());
+        expr += vars[p.fi] * get_ll(p.se);
     }
     if(type == "max") {
-        cout << "setting objective to max" << endl;
+        cout << "[c++] Setting objective to max" << endl;
         solver.setObjective(expr, GRB_MAXIMIZE);
     } else if(type == "min") {
+        cout << "[c++] Setting objective to min" << endl;
         solver.setObjective(expr, GRB_MINIMIZE);
     } else {
         ASSERT(false, "unknown objective type " << type);
     }
-    get_status(solver);
+    // get_status(solver);
 }
 
 // TODO: we can iterate over multiple solutions
@@ -122,24 +134,25 @@ map<string,FT> Gurobi_MIP::solve() {
     }
     std::cout << std::endl;*/
 
-    get_status(solver);
+    // Print objective function
+    {
+        cout << "[c++]" << "Objective function: ";
+        auto expr = solver.getObjective().getLinExpr();
+        int terms = expr.size();
+        for (int i = 0; i < terms; ++i) {
+            GRBVar var = expr.getVar(i);  // get variable associated with this term
+            double coeff = expr.getCoeff(i);  // get coefficient of this term
+            std::string varName = var.get(GRB_StringAttr_VarName);  // get variable name
+            std::cout << coeff << "*" << varName;
 
-    debug(solver.getObjective().size());
-    auto expr = solver.getObjective().getLinExpr();
-    int terms = expr.size();
-    debug(terms);
-    for (int i = 0; i < terms; ++i) {
-        GRBVar var = expr.getVar(i);  // get variable associated with this term
-        double coeff = expr.getCoeff(i);  // get coefficient of this term
-        std::string varName = var.get(GRB_StringAttr_VarName);  // get variable name
-        std::cout << coeff << "*" << varName;
-
-        // if not the last term, print " + "
-        if (i < terms - 1) {
-            std::cout << " + ";
+            // if not the last term, print " + "
+            if (i < terms - 1) {
+                std::cout << " + ";
+            }
         }
+        std::cout << std::endl;
+        cout << "[c++]" << "End of objective function" << endl;
     }
-    std::cout << std::endl;
 
     get_status(solver);
 
@@ -152,7 +165,7 @@ map<string,FT> Gurobi_MIP::solve() {
     double objval = 0;
     if (optimstatus == GRB_OPTIMAL) {
       objval = solver.get(GRB_DoubleAttr_ObjVal); // TODO: Get int for int model
-      cout << "Optimal objective: " << objval << endl;
+      cout << "[c++] Optimal objective: " << objval << endl;
     } else if (optimstatus == GRB_INF_OR_UNBD) {
       ASSERT(false, "Model is infeasible or unbounded");
     } else if (optimstatus == GRB_INFEASIBLE) {
@@ -164,10 +177,9 @@ map<string,FT> Gurobi_MIP::solve() {
     }
 
     map<string,FT> res;
-    debug(sz(vars));
     foe(p, vars) {
         assert(p.fi == p.se.get(GRB_StringAttr_VarName));
-        res[p.fi] = p.se.get(GRB_DoubleAttr_X); // TODO: get int for integer vars and bools
+        res[p.fi] = (ll)p.se.get(GRB_DoubleAttr_X); // TODO: get int for integer vars and bools
     }
     return res;
 }

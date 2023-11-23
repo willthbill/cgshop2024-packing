@@ -18,7 +18,7 @@ Item Item::move_ref_point(Point p) {
         Vector(p.x() - ref.x(), p.y() - ref.y())
     );
     Polygon tpol = transform(translate, pol);
-    foe(e, tpol) cout << e.x() << " " << e.y() << endl;
+    // foe(e, tpol) cout << e.x() << " " << e.y() << endl;
     return Item {value, quantity, tpol, idx};
 }
 

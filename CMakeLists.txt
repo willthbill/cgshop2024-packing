@@ -83,15 +83,20 @@ execute_process(COMMAND ./bin/getpybindsuffix.sh OUTPUT_VARIABLE pybind11_suffix
 
 set(CGALLIB CGAL::CGAL CGAL::SCIP_support)
 
+set(PRECOMPILE_HEADERS "src/cpp/pch.h")
+
 ###### CPP ######
 ### lib2 ###
 add_library(util SHARED src/cpp/lib2/util.cpp)
+target_precompile_headers(util PUBLIC ${PRECOMPILE_HEADERS})
 target_link_libraries(util ${CGALLIB})
 
 add_library(io SHARED src/cpp/io.cpp)
+target_precompile_headers(io PUBLIC ${PRECOMPILE_HEADERS})
 target_link_libraries(io ${CGALLIB} util geometry_utils)
 
 add_library(configuration_space SHARED src/cpp/lib2/configuration_space.cpp)
+target_precompile_headers(configuration_space PUBLIC ${PRECOMPILE_HEADERS})
 target_link_libraries(configuration_space ${CGALLIB} geometry_utils)
 
 add_library(mip SHARED src/cpp/lib2/mip/mip.cpp)
@@ -103,12 +108,17 @@ target_link_libraries(scip_mip ${CGALLIB} geometry_utils mip)
 add_library(gurobi_mip SHARED src/cpp/lib2/mip/gurobi.cpp)
 target_link_libraries(gurobi_mip ${CGALLIB} mip ${GUROBI_CXX_LIBRARY} ${GUROBI_LIBRARY})
 
+add_library(snap SHARED src/cpp/lib2/snap.cpp)
+target_precompile_headers(snap PUBLIC ${PRECOMPILE_HEADERS})
+target_link_libraries(snap ${CGALLIB} intersection_predicates geometry_utils)
+
 ### algorithms ###
 #add_library(dummy_algorithm SHARED src/cpp/algorithms/dummy.cpp)
 #target_link_libraries(dummy_algorithm CGAL::CGAL util)
 
 add_library(optimal_algorithm SHARED src/cpp/algorithms/optimal.cpp)
-target_link_libraries(optimal_algorithm ${CGALLIB} partition_constructor scip_mip gurobi_mip configuration_space geometry_utils io)
+target_precompile_headers(optimal_algorithm PUBLIC ${PRECOMPILE_HEADERS})
+target_link_libraries(optimal_algorithm ${CGALLIB} partition_constructor gurobi_mip configuration_space geometry_utils io snap)
 
 #add_executable(mip_example src/cpp/lib2/mip_example.cpp)
 #target_link_libraries(mip_example CGAL::CGAL CGAL::SCIP_support)
