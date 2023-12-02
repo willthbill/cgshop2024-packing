@@ -121,12 +121,12 @@ map<string,FT> Gurobi_MIP::solve() {
     get_status(solver);
 
     // solver.set(GRB_DoubleParam_Cutoff, 100);
-    solver.set(GRB_DoubleParam_MIPGap, 0.001);
+    solver.set(GRB_DoubleParam_MIPGap, 0.1);
     solver.set(GRB_IntParam_MIPFocus, 1);
     solver.set(GRB_IntParam_NumericFocus, 3);
     solver.set(GRB_IntParam_Presolve, 0);
     solver.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
-    // solver.set(GRB_DoubleParam_IntFeasTol, 1e-9);
+    solver.set(GRB_DoubleParam_IntFeasTol, 1e-9);
     solver.optimize();
 
     auto expr = solver.getObjective();//.getLinExpr();

@@ -83,6 +83,35 @@ Polygon SnapToGrid::snap(Polygon pol) {
             res.push_back(p);
         }
     }
+
+    assert(is_completely_inside(res,pol));
+
+    {
+        int before = res.size();
+        while(true) {
+            bool found = false;
+            for(int i = 0; i < sz(res); i++) {
+                Polygon newres;
+                int idx = -1;
+                for(auto p : res) {
+                    idx++;
+                    if(idx == i) continue;
+                    newres.push_back(p);
+                }
+                if(sz(newres) <= 2) continue;
+                if(!newres.is_simple()) continue;
+                if(newres.area() > res.area()) continue;
+                if(is_completely_inside(newres, pol)) {
+                    found = true;
+                    res = newres;
+                }
+            }
+            if(!found) break;
+        }
+        int after = res.size();
+        cout << "snapper optimization: " << sz(pol) << " -> " << before << " -> " << after << " (diff = " << before - after << ")" << endl;
+    }
+
     // TODO: remove redundant points
     //IntersectionPredicates pred (res);
     //assert(pred.is_completely_inside_slow(pol));

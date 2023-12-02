@@ -131,15 +131,7 @@ void add_iteminitem_constraints(int i, int j, vector<string>& in_use_binaries, I
 PackingOutput optimal_algorithm(PackingInput input123) {
     cout << "[c++] RUNNING OPTIMAL ALGORITHM" << endl;
     ItemsContainer items_original123 = input123.items.expand();
-    ItemsContainer _items = items_original123;
-
-    ItemsContainer items;
-    items.add_item(_items[0]);
-    items.add_item(_items[4]);
-    items.add_item(_items[5]);
-    items.add_item(_items[6]);
-    items.add_item(_items[7]);
-    items_original123 = items;
+    ItemsContainer items = items_original123;
 
     auto container = input123.container;
     foe(e, container) {
