@@ -287,6 +287,68 @@ PackingOutput optimal_algorithm(PackingInput input123) {
             cout << "mxcnt: " << mxcnt << endl;
         }
     }
+
+    fon(i, sz(items)) {
+        fon(j, sz(items)) {
+            if(i >= j) continue;
+            if(solution[in_use_binaries[i]] > 0.5 && solution[in_use_binaries[j]] > 0.5) {
+                Gurobi_MIP tmp;
+                set<string> nonebins;
+                tmp.add_binary_variable(in_use_binaries[i]);
+                nonebins.insert(in_use_binaries[i]);
+                tmp.add_binary_variable(in_use_binaries[j]);
+                nonebins.insert(in_use_binaries[j]);
+                {
+                    auto [x, y] = get_ref_coord_variable_names(i);
+                    tmp.add_integer_variable(x);
+                    nonebins.insert(x);
+                    tmp.add_integer_variable(y);
+                    nonebins.insert(y);
+                }
+                {
+                    auto [x, y] = get_ref_coord_variable_names(j);
+                    tmp.add_integer_variable(x);
+                    nonebins.insert(x);
+                    tmp.add_integer_variable(y);
+                    nonebins.insert(y);
+                }
+                add_iteminitem_constraints(i, j, in_use_binaries, items, tmp);
+
+                int sum = 0;
+                foe(t, tmp.vars) {
+                    if(!nonebins.count(t.fi) && solution[t.fi] > 0.5) {
+                        int cnt = 0;
+                        foe(c, tmp.constraints["geq"]) {
+                            bool ok = 0;
+                            foe(term, c.fi) {
+                                if(term.fi == t.fi) {
+                                    ok = 1;
+                                }
+                            }
+                            if(!ok) continue;
+                            FT lhs = 0;
+                            foe(term, c.fi) {
+                                // cout << solution[term.fi] << " " << term.se << endl;
+                                lhs += (solution[term.fi] > 0.5 ? ceil_exact(solution[term.fi]) : floor_exact(solution[term.fi])) * term.se;
+                                // lhs += solution[term.fi] * term.se;
+                            }
+                            FT rhs = c.se;
+                            //cout << lhs << " " << rhs << endl;
+                            FT diff = lhs - rhs;
+                            //cout << "diff: " << diff.to_double() << endl;
+                            //ASSERT(lhs >= rhs - 0.01, "geq constraint does not hold with diff=" << diff.to_double());
+                            if(lhs >= rhs - 0.01) {
+                                cnt++;
+                            }
+                        }
+                        cout << "amount: " << cnt << endl;
+                        sum++;
+                    }
+                }
+                cout << "enabled: " << i << " " << j << " " << sum << endl;
+            }
+        }
+    }
     return output;
 }
 

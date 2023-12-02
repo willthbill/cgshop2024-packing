@@ -126,7 +126,7 @@ map<string,FT> Gurobi_MIP::solve() {
     solver.set(GRB_IntParam_NumericFocus, 3);
     solver.set(GRB_IntParam_Presolve, 0);
     solver.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
-    solver.set(GRB_DoubleParam_IntFeasTol, 1e-9);
+    // solver.set(GRB_DoubleParam_IntFeasTol, 1e-9);
     solver.optimize();
 
     auto expr = solver.getObjective();//.getLinExpr();
