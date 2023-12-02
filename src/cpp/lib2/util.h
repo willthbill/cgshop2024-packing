@@ -16,7 +16,7 @@ CGAL::Gmpq floor_exact(const CGAL::Gmpq &q);
 
 CGAL::Gmpq ceil_exact(const CGAL::Gmpq &q); 
 
-bool is_integer(const CGAL::Gmpz v);
+bool is_integer(const CGAL::Gmpq v);
 
 // Usage
 // CGAL::Gmpq q = /* your rational number */;

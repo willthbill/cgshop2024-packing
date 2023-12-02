@@ -16,7 +16,9 @@ GRBEnv& get_env() {
     if(is_gurobi_initialized) return *gurobi_env;
     gurobi_env = new GRBEnv(true);
     gurobi_env->set("LogFile", "/tmp/gurobi_mip.log");
+    cout << "set env" << endl;
     gurobi_env->start();
+    cout << "started env" << endl;
     is_gurobi_initialized = true;
     return *gurobi_env;
 }
@@ -51,14 +53,15 @@ void Gurobi_MIP::_add_constraint(vector<pair<string,FT>> a, FT b, string type) {
     foe(p, a) {
         ASSERT(vars.count(p.fi) == 1, "variable " << p.fi << " was not created");
     }
-    cout << "[c++] Adding constraint" << endl;
+    constraints[type].pb({a,b});
+    /*cout << "[c++] Adding constraint" << endl;
     fon(i, sz(a)) {
         cout << "   " << a[i].fi << " * " << get_ll(a[i].se);
         if(i < sz(a) - 1) cout << " +";
         cout << endl;
     }
     cout << "   " << type << " " << get_ll(b) << endl;
-    cout << "[c++] End of constraint" << endl;
+    cout << "[c++] End of constraint" << endl;*/
     GRBLinExpr expr = 0;
     foe(p, a) {
         expr += vars[p.fi] * get_ll(p.se);
@@ -77,7 +80,7 @@ void Gurobi_MIP::_add_constraint(vector<pair<string,FT>> a, FT b, string type) {
 
 void Gurobi_MIP::_add_variable(string name, string type) {
     ASSERT(vars.count(name) == 0, "variable " << name << " already exists");
-    cout << "[c++] Adding variable " << name << " of type " << type << endl;
+    // cout << "[c++] Adding variable " << name << " of type " << type << endl;
     if(type == "con") {
         ASSERT(false, "cannot use continous vairable right now");
         vars[name] = solver.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, name);
@@ -99,6 +102,7 @@ void Gurobi_MIP::_set_objective(string type, vector<pair<string,FT>> c) {
     foe(p, c) {
         expr += vars[p.fi] * get_ll(p.se);
     }
+    // cout << "[c++] Objective: " << expr << endl;
     if(type == "max") {
         cout << "[c++] Setting objective to max" << endl;
         solver.setObjective(expr, GRB_MAXIMIZE);
@@ -114,52 +118,18 @@ void Gurobi_MIP::_set_objective(string type, vector<pair<string,FT>> c) {
 // TODO: we can iterate over multiple solutions
 map<string,FT> Gurobi_MIP::solve() {
 
-    // Get linear and quadratic objective components
-    /*GRBLinExpr linObj = solver.getObjective().getLinExpr();
-    std::string linObjStr = linObj.toString();
-    std::cout << "Objective Function: " << linObjStr << std::endl;*/
-    /*GRBVar* vars = solver.getVars();
-    int numVars = solver.get(GRB_IntAttr_NumVars);
-    debug(numVars);
-
-    std::cout << "Objective Function: ";
-    for (int i = 0; i < numVars; ++i) {
-        double coeff = vars[i].get(GRB_DoubleAttr_Obj);
-        if (coeff != 0) {
-            std::cout << coeff << " * " << vars[i].get(GRB_StringAttr_VarName);
-            if (i < numVars - 1) {
-                std::cout << " + ";
-            }
-        }
-    }
-    std::cout << std::endl;*/
-
-    // Print objective function
-    {
-        cout << "[c++]" << "Objective function: ";
-        auto expr = solver.getObjective().getLinExpr();
-        int terms = expr.size();
-        for (int i = 0; i < terms; ++i) {
-            GRBVar var = expr.getVar(i);  // get variable associated with this term
-            double coeff = expr.getCoeff(i);  // get coefficient of this term
-            std::string varName = var.get(GRB_StringAttr_VarName);  // get variable name
-            std::cout << coeff << "*" << varName;
-
-            // if not the last term, print " + "
-            if (i < terms - 1) {
-                std::cout << " + ";
-            }
-        }
-        std::cout << std::endl;
-        cout << "[c++]" << "End of objective function" << endl;
-    }
-
     get_status(solver);
 
     // solver.set(GRB_DoubleParam_Cutoff, 100);
-    solver.set(GRB_DoubleParam_MIPGap, 0.1);
+    solver.set(GRB_DoubleParam_MIPGap, 0.001);
     solver.set(GRB_IntParam_MIPFocus, 1);
+    solver.set(GRB_IntParam_NumericFocus, 3);
+    solver.set(GRB_IntParam_Presolve, 0);
+    solver.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
     solver.optimize();
+
+    auto expr = solver.getObjective();//.getLinExpr();
+    cout << "[c++]" << "Objective function: " << expr << endl;
 
     int optimstatus = solver.get(GRB_IntAttr_Status);
     double objval = 0;
@@ -179,7 +149,29 @@ map<string,FT> Gurobi_MIP::solve() {
     map<string,FT> res;
     foe(p, vars) {
         assert(p.fi == p.se.get(GRB_StringAttr_VarName));
-        res[p.fi] = (ll)p.se.get(GRB_DoubleAttr_X); // TODO: get int for integer vars and bools
+        res[p.fi] = p.se.get(GRB_DoubleAttr_X); // TODO: get int for integer vars and bools
+    }
+    double tol = 1e-3;
+    foe(c, constraints["eq"]) {
+        FT lhs = 0;
+        foe(term, c.fi) lhs += res[term.fi] * term.se;
+        FT rhs = c.se;
+        FT diff = rhs - lhs;
+        ASSERT(lhs == rhs, "equal constraint does not hold with diff=" << diff.to_double());
+    }
+    foe(c, constraints["geq"]) {
+        FT lhs = 0;
+        foe(term, c.fi) lhs += res[term.fi] * term.se;
+        FT rhs = c.se;
+        FT diff = rhs - lhs;
+        ASSERT(lhs >= rhs - tol, "geq constraint does not hold with diff=" << diff.to_double());
+    }
+    foe(c, constraints["leq"]) {
+        FT lhs = 0;
+        foe(term, c.fi) lhs += res[term.fi] * term.se;
+        FT rhs = c.se;
+        FT diff = rhs - lhs;
+        ASSERT(lhs <= rhs + tol, "geq constraint does not hold with diff=" << diff.to_double());
     }
     return res;
 }

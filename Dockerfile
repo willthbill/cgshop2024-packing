@@ -3,14 +3,11 @@
 FROM greyltc/archlinux-aur:yay
 
 
-# Update the package database and upgrade the system
-RUN pacman -Syu --noconfirm
-
 # Install Python 3.10, pip, CGAL, and CMake
-RUN pacman -S --noconfirm cgal cmake git gcc boost make scons fzf direnv which tree vim vi neovim htop tk fontconfig ttf-dejavu fd scip tmux gdb
+RUN pacman -Syu --noconfirm && pacman -S --noconfirm cgal cmake git gcc boost make scons fzf direnv which tree vim vi neovim htop tk fontconfig ttf-dejavu fd scip tmux gdb
 
 # Install aur packages
-RUN aur-install gurobi
+RUN pacman -Syu --noconfirm && aur-install gurobi
 
 RUN pacman -Syu --noconfirm sudo
 
@@ -31,8 +28,6 @@ RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 RUN cat /etc/sudoers
 
 WORKDIR /app
-RUN mkdir -p /opt/gurobi
-RUN cp ./licenses/gurobi.lic /opt/gurobi
 RUN chown -R myuser:mygroup /app
 USER myuser
 RUN python -m venv venv
@@ -46,5 +41,10 @@ RUN echo 'source /home/myuser/.bashrc' >> ~/.bash_profile
 
 # Set the default command for the container
 WORKDIR /app/max-polygon-packing
-CMD ["/bin/bash", "-c", "direnv allow; bash"]
+RUN sudo mkdir -p /opt/gurobi
+
+# quick fix
+RUN sudo ln -sf /usr/lib/libgurobi_g++8.5.a /usr/lib/libgurobi_c++.a
+
+CMD ["/bin/bash", "-c", "sudo cp /app/max-polygon-packing/licenses/gurobi.lic /opt/gurobi; direnv allow; bash"]
 

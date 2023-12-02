@@ -1,11 +1,15 @@
 #include <bits/stdc++.h>
+#include <CGAL/Simple_cartesian.h>
 
-#include "io.h"
 
-#include "lib2/util.h"
+#include "lib/geometry/intersection_predicates.h"
 #include "lib/util/geometry_utils.h"
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
+
+#include "lib2/util.h"
+
+#include "io.h"
 
 using namespace std;
 
@@ -92,8 +96,57 @@ Vector PackingOutput::get_translation(Item item) {
     return translation;
 }
 
+bool is_completely_outside(Polygon a, Polygon b) {
+    Polygon_set intersection; intersection.intersection(
+        to_polygon_set(a),
+        to_polygon_set(b)
+    );
+    auto arr = to_polygon_vector(intersection);
+    FT res = 0;
+    foe(p, arr) res += p.outer_boundary().area();
+    return res == 0;
+}
+
+bool is_completely_inside(Polygon a, Polygon b) {
+    Polygon_set intersection; intersection.intersection(
+        to_polygon_set(a),
+        to_polygon_set(b)
+    );
+    auto arr = to_polygon_vector(intersection);
+    FT res = 0;
+    foe(p, arr) res += p.outer_boundary().area();
+    return res == b.area();
+}
+
+bool is_point_inside(Polygon poly, Point p) {
+    switch (CGAL::bounded_side_2(poly.vertices_begin(), poly.vertices_end(), p)) {
+        case CGAL::ON_BOUNDED_SIDE:
+            return true;
+        case CGAL::ON_BOUNDARY:
+            return true;
+        case CGAL::ON_UNBOUNDED_SIDE:
+            return false;
+    }
+    assert(false);
+}
+
 void PackingOutput::validate_result() {
-    // TODO: check no overlap
+    fon(i, sz(items)) {
+        auto& i1 = items[i];
+        fon(j, i) {
+            if(i == j) continue;
+            auto& i2 = items[j];
+            if(!is_completely_outside(i1.pol, i2.pol)) {
+                cout << "!!!!! OVERLAP BETWEEN ITEMS IN SOLUTION !!!!!" << endl;
+            }
+            if(is_point_inside(i1.pol, i2.get_reference_point())) {
+                cout << "!!!!! ITEM REFERENCE POINT IS INSIDE OTHER ITEM !!!!!" << endl;
+            }
+        }
+        if(!is_completely_inside(input.container, i1.pol)) {
+            cout << "!!!!! ITEM NOT IN CONTAINER !!!!!" << endl;
+        }
+    }
 }
 
 ll PackingOutput::get_score() {

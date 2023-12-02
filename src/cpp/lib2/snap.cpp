@@ -26,6 +26,16 @@ Polygon SnapToGrid::get_single_polygon() {
     }
     assert(false);
 }
+bool is_completely_inside(Polygon a, Polygon b) {
+    Polygon_set intersection; intersection.intersection(
+        to_polygon_set(a),
+        to_polygon_set(b)
+    );
+    auto arr = to_polygon_vector(intersection);
+    FT res = 0;
+    foe(p, arr) res += p.outer_boundary().area();
+    return res == b.area();
+}
 Polygon SnapToGrid::snap(Polygon pol) {
     Polygon_set pset;
     pset.insert(pol);
@@ -68,13 +78,14 @@ Polygon SnapToGrid::snap(Polygon pol) {
     }
     Polygon res;
     foe(p, ep) {
-        bool is_integer = is_integer(p.x()) && is_integer(p.y());
-        if(is_integer) {
+        bool is_int = is_integer(p.x()) && is_integer(p.y());
+        if(is_int) {
             res.push_back(p);
         }
     }
     // TODO: remove redundant points
-    IntersectionPredicates pred (res);
-    assert(pred.is_completely_inside_slow(pol));
+    //IntersectionPredicates pred (res);
+    //assert(pred.is_completely_inside_slow(pol));
+    assert(is_completely_inside(res,pol));
     return res;
 }

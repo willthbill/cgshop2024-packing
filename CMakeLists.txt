@@ -93,7 +93,7 @@ target_link_libraries(util ${CGALLIB})
 
 add_library(io SHARED src/cpp/io.cpp)
 target_precompile_headers(io PUBLIC ${PRECOMPILE_HEADERS})
-target_link_libraries(io ${CGALLIB} util geometry_utils)
+target_link_libraries(io ${CGALLIB} util geometry_utils intersection_predicates)
 
 add_library(configuration_space SHARED src/cpp/lib2/configuration_space.cpp)
 target_precompile_headers(configuration_space PUBLIC ${PRECOMPILE_HEADERS})

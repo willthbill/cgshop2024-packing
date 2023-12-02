@@ -26,7 +26,7 @@ def append_items_arrange(patches, items, container):
             x_off = x_start + i*x_step
             y_off = j*y_step
             P = [(p[0]+x_off, p[1]+y_off) for p in item]
-            patches.append(Polygon(P, closed=True))
+            patches.append(Polygon(P, closed=True, ec="black"))
 
 def append_items(patches, items):
     for P in items:
@@ -42,6 +42,7 @@ def visualize(conf, show=True, out_file=None, preserve_coords=False):
 
     min_value=conf.get_min_value()
     max_value=conf.get_max_value()
+    min_value -= (max_value - min_value) * 0.2
 
     cmap = mpl.cm.hot_r
     norm = mpl.colors.Normalize(vmin=min_value, vmax=max_value)
@@ -52,7 +53,7 @@ def visualize(conf, show=True, out_file=None, preserve_coords=False):
     if preserve_coords: append_items(patches, items)
     else: append_items_arrange(patches, items, container)
 
-    patch_collection = PatchCollection(patches, cmap=cmap, norm=norm, ec="black", lw=.002)
+    patch_collection = PatchCollection(patches, cmap=cmap, norm=norm, ec="black")#, lw=.002)
     if min_value < max_value:
         patch_collection.set_array(conf.values)
         patch_collection.set_clim([min_value, max_value])

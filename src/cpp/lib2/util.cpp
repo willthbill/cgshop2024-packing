@@ -42,7 +42,7 @@ CGAL::Gmpq ceil_exact(const CGAL::Gmpq &q) {
     }
 }
 
-bool is_integer(const CGAL::Gmpz v) {
+bool is_integer(const CGAL::Gmpq v) {
     return v == floor_exact(v);
 }
 

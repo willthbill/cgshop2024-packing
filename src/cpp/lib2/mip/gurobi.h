@@ -14,6 +14,19 @@ public:
 
     GRBModel solver;
     std::map<std::string,GRBVar> vars;
+    std::map<std::string,
+        std::vector<
+            std::pair<
+                std::vector<
+                    std::pair<
+                        std::string,
+                        FT
+                    >
+                >,
+                FT
+            >
+        >
+    > constraints;
 
     Gurobi_MIP();
 

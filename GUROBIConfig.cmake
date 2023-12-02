@@ -27,6 +27,7 @@ if(CXX)
             HINTS ${GUROBI_DIR} $ENV{GUROBI_HOME}
             PATH_SUFFIXES lib)
     else()
+        message("in cxx")
         find_library(GUROBI_CXX_LIBRARY
             NAMES gurobi_c++
             HINTS ${GUROBI_DIR} $ENV{GUROBI_HOME}
