@@ -2,6 +2,16 @@
     "C_Cpp.default.compileCommands": "compile_commands.json",
     "C_Cpp.intelliSenseEngine": "Tag Parser",
     "files.associations": {
-        "vector": "cpp"
+        "vector": "cpp",
+        "array": "cpp",
+        "*.tcc": "cpp",
+        "memory": "cpp",
+        "format": "cpp",
+        "future": "cpp",
+        "istream": "cpp",
+        "functional": "cpp",
+        "tuple": "cpp",
+        "utility": "cpp",
+        "variant": "cpp"
     }
 }

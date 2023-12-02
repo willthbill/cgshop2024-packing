@@ -15,6 +15,14 @@ using namespace std;
 
 typedef CGAL::Aff_transformation_2<K> Transformation;
 
+// TODO: duplicate implement in optimal_packing.cpp
+void assert_is_integer_polygon(Polygon& pol) {
+    foe(p, pol) {
+        ASSERT(is_integer(p.x()), "polygon has non-integer coordinate");
+        ASSERT(is_integer(p.y()), "polygon has non-integer coordinate");
+    }
+}
+
 Item Item::move_ref_point(Point p) {
     auto ref = get_reference_point();
     Transformation translate(
@@ -66,6 +74,7 @@ Item& ItemsContainer::operator[](std::size_t i) {
 }
 
 void PackingOutput::validate_item(Item item) {
+    assert_is_integer_polygon(item.pol);
     ASSERT(item_count[item.idx] < input.items[item.idx].quantity,"");
     ASSERT(item.quantity == 1ll, "in a result all quanities must be 1");
     ASSERT(input.items[item.idx].value == item.value,"");
