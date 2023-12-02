@@ -37,12 +37,12 @@ bool is_completely_inside(Polygon a, Polygon b) {
     return res == b.area();
 }
 
-bool is_point_inside(Polygon poly, Point p) {
+bool is_point_strictly_inside(Polygon poly, Point p) {
     switch (CGAL::bounded_side_2(poly.vertices_begin(), poly.vertices_end(), p)) {
         case CGAL::ON_BOUNDED_SIDE:
             return true;
         case CGAL::ON_BOUNDARY:
-            return true;
+            return false;
         case CGAL::ON_UNBOUNDED_SIDE:
             return false;
     }
@@ -213,6 +213,7 @@ PackingOutput optimal_algorithm(PackingInput input123) {
         }
     }
     auto solution = problem.solve();
+    foe(p, solution) debug(p);
     PackingOutput output (input123);
     fon(i, sz(items)) {
         if(solution[in_use_binaries[i]] > 0.5) {
@@ -231,79 +232,59 @@ PackingOutput optimal_algorithm(PackingInput input123) {
             debug("out", solution[in_use_binaries[i]]);
         }
     }
-    fon(i, sz(items)) {
-        fon(j, sz(items)) {
+    fon(i, sz(output)) {
+        fon(j, sz(output)) {
             if(i >= j) continue;
-            if(solution[in_use_binaries[i]] > 0.5 && solution[in_use_binaries[j]] > 0.5) {
-                vector<Polygon> partition;
+            vector<Polygon> partition;
+            cout << "i = " << i << " j = " << j << endl;
+            {
+                Polygon_set disallowed (output.items[j].pol);
+                ConfigurationSpace cp (disallowed, output.items[i].pol, output.items[i].get_reference_point());
                 {
-                    Polygon_set disallowed (items[j].pol);
-                    ConfigurationSpace cp (disallowed, items[i].pol, items[i].get_reference_point());
-                    SnapToGrid snapper (get_complement(cp.space)); // TODO: taking complement twice
-                    Polygon square; square.pb(Point(-inf,-inf));square.pb(Point(inf,-inf));square.pb(Point(inf,inf));square.pb(Point(-inf,inf));
-                    Polygon_set ps (square); ps.intersection(get_complement(snapper.space));
-                    auto polygons = to_polygon_vector(ps);
-                    assert(sz(polygons) == 1);
-                    auto polygon = polygons[0];
-                    assert(polygon.number_of_holes() == 1);
-                    assert(is_point_inside());
-                    PartitionConstructor pc (polygon);
-                    partition = pc.get_constrained_delaunay_triangulation();
+                    auto comp = get_complement(cp.space);
+                    auto pol = to_polygon_vector(comp)[0].outer_boundary();
+                    cout << (!is_point_strictly_inside(pol, output.items[i].get_reference_point())) << endl;
                 }
+                SnapToGrid snapper (get_complement(cp.space)); // TODO: taking complement twice
+                Polygon square; square.pb(Point(-inf,-inf));square.pb(Point(inf,-inf));square.pb(Point(inf,inf));square.pb(Point(-inf,inf));
+                Polygon_set ps (square); ps.intersection(get_complement(snapper.space));
+                auto polygons = to_polygon_vector(ps);
+                assert(sz(polygons) == 1);
+                auto polygon = polygons[0];
+                assert(polygon.number_of_holes() == 1);
+                // assert(!is_point_inside(polygon.outer_boundary(), output.items[i].get_reference_point()));
+                cout << (!is_point_strictly_inside(polygon.holes()[0], output.items[i].get_reference_point())) << endl;
+                PartitionConstructor pc (polygon);
+                partition = pc.get_constrained_delaunay_triangulation();
+            }
 
-                /*Gurobi_MIP tmp;
-                set<string> nonebins;
-                tmp.add_binary_variable(in_use_binaries[i]);
-                nonebins.insert(in_use_binaries[i]);
-                tmp.add_binary_variable(in_use_binaries[j]);
-                nonebins.insert(in_use_binaries[j]);
-                {
-                    auto [x, y] = get_ref_coord_variable_names(i);
-                    tmp.add_integer_variable(x);
-                    nonebins.insert(x);
-                    tmp.add_integer_variable(y);
-                    nonebins.insert(y);
-                }
-                {
-                    auto [x, y] = get_ref_coord_variable_names(j);
-                    tmp.add_integer_variable(x);
-                    nonebins.insert(x);
-                    tmp.add_integer_variable(y);
-                    nonebins.insert(y);
-                }
-                add_iteminitem_constraints(i, j, in_use_binaries, items, tmp);
-
-                int sum = 0;
-                foe(t, tmp.vars) {
-                    if(!nonebins.count(t.fi) && solution[t.fi] > 0.5) {
-                        int cnt = 0;
-                        foe(c, tmp.constraints["geq"]) {
-                            bool ok = 0;
-                            foe(term, c.fi) {
-                                if(term.fi == t.fi) {
-                                    ok = 1;
-                                }
-                            }
-                            if(!ok) continue;
-                            cnt++;
-                            FT lhs = 0;
-                            foe(term, c.fi) {
-                                // cout << solution[term.fi] << " " << term.se << endl;
-                                lhs += solution[term.fi] * term.se;
-                            }
-                            FT rhs = c.se;
-                            //cout << lhs << " " << rhs << endl;
-                            FT diff = lhs - rhs;
-                            //cout << "diff: " << diff.to_double() << endl;
-                            ASSERT(lhs >= rhs - 0.01, "geq constraint does not hold with diff=" << diff.to_double());
-                        }
-                        cout << "amount: " << cnt << endl;
-                        sum++;
+            Point ref = output.items[j].get_reference_point(); // (x1,y1)
+            auto x1 = output.items[j].get_reference_point().x();
+            auto y1 = output.items[j].get_reference_point().y();
+            auto x2 = output.items[i].get_reference_point().x();
+            auto y2 = output.items[i].get_reference_point().y();
+            int mxcnt = 0;
+            foe(tri, partition) {
+                ASSERT(tri.orientation() == CGAL::COUNTERCLOCKWISE, "must have counterclockwise orientation");
+                int cnt = 0;
+                fon(k, sz(tri)) {
+                    Vector c1 = tri[k] - ref;
+                    Vector c2 = tri[(k+1) % sz(tri)] - ref;
+                    Vector v1 (c2.x() - c1.x(), c2.y() - c1.y());
+                    // v2 = (x2 - x1 - c1.x(), y2 - y1 - c1.y());
+                    // Cross product
+                        // cross(v1,v2) = v1.x() * (y2 - y1 - c1.y()) - v1.y() * (x2 - x1 - c1.x())
+                        // = v1.x() * y2 - v1.x() * y1 - v1.x() * c1.y() - v1.y() * x2 + v1.y() * x1 + v1.y() * c1.x() <= 0   TODO: <= is correct right?
+                        // <=>
+                        // v1.x() * y2 - v1.x() * y1 - v1.y() * x2 + v1.y() * x1 <= v1.x() * c1.y() - v1.y() * c1.x()
+                    // cout << "v1.x() * c1.y() - v1.y() * c1.x()" << " " << (v1.x() * c1.y() - v1.y() * c1.x()).to_double() << endl;
+                    if(y2 * v1.x() + y1 * -v1.x() + x2 * -v1.y()+ x1 * v1.y() >= v1.x() * c1.y() - v1.y() * c1.x()) {
+                        cnt++;
                     }
                 }
-
-                cout << "enabled: " << i << " " << j << " " << sum << endl;*/
+                mxcnt = max(mxcnt, cnt);
             }
+            cout << "mxcnt: " << mxcnt << endl;
         }
     }
     return output;

@@ -42,15 +42,14 @@ struct PackingInput {
 };
 
 class PackingOutput {
-private:
+
+public:
 
     PackingInput input;
     ItemsContainer items;
     std::map<int,int> item_count;
 
     void validate_item(Item item); 
-
-public:
 
     PackingOutput(PackingInput _input); 
 
