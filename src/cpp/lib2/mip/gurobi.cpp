@@ -130,7 +130,7 @@ map<string,FT> Gurobi_MIP::solve() {
     solver.optimize();
 
     auto expr = solver.getObjective();//.getLinExpr();
-    cout << "[c++]" << "Objective function: " << expr << endl;
+    cout << "[c++] " << "Objective function: " << expr << endl;
 
     int optimstatus = solver.get(GRB_IntAttr_Status);
     double objval = 0;
@@ -151,6 +151,7 @@ map<string,FT> Gurobi_MIP::solve() {
     foe(p, vars) {
         assert(p.fi == p.se.get(GRB_StringAttr_VarName));
         res[p.fi] = p.se.get(GRB_DoubleAttr_X); // TODO: get int for integer vars and bools
+        debug(p.fi);
     }
     double tol = 1e-3;
     foe(c, constraints["eq"]) {

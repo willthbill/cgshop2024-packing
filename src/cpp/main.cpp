@@ -56,6 +56,7 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorith
     cout << "      number of vertices on container: " << sz(input.container) << endl;
     PackingOutput res = optimal_algorithm(input);
     { // extra validation
+        cout << "[c++] Validating result" << endl;
         PackingOutput val (input);
         foe(item, res) val.add_item(item);
         val.validate_result();

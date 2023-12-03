@@ -72,4 +72,25 @@ Point get_lowest_point(const Polygon& polygon) {
     return lowest_point;
 }
 
+bool is_point_strictly_inside(Polygon poly, Point p) {
+    switch (CGAL::bounded_side_2(poly.vertices_begin(), poly.vertices_end(), p)) {
+        case CGAL::ON_BOUNDED_SIDE:
+            return true;
+        case CGAL::ON_BOUNDARY:
+            return false;
+        case CGAL::ON_UNBOUNDED_SIDE:
+            return false;
+    }
+    assert(false);
+}
 
+bool is_completely_inside(Polygon a, Polygon b) {
+    Polygon_set intersection; intersection.intersection(
+        to_polygon_set(a),
+        to_polygon_set(b)
+    );
+    auto arr = to_polygon_vector(intersection);
+    FT res = 0;
+    foe(p, arr) res += p.outer_boundary().area();
+    return res == b.area();
+}

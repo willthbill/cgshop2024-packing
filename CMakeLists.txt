@@ -59,6 +59,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I$ENV{SRC_PATH_HOST}")
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "cpp")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__local__")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wfatal-errors")
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Wextra -pedantic -Wshadow -Wformat=2 -Wfloat-equal -Wconversion -Wlogical-op -Wshift-overflow=2 -Wduplicated-cond -Wcast-qual -Wcast-align -Wfatal-errors")
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fsanitize=undefined -fno-sanitize-recover -fstack-protector")
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -D_FORTIFY_SOURCE=2")
@@ -112,13 +113,17 @@ add_library(snap SHARED src/cpp/lib2/snap.cpp)
 target_precompile_headers(snap PUBLIC ${PRECOMPILE_HEADERS})
 target_link_libraries(snap ${CGALLIB} intersection_predicates geometry_utils)
 
+add_library(optimal_packing SHARED src/cpp/lib2/optimal_packing.cpp)
+target_precompile_headers(optimal_packing PUBLIC ${PRECOMPILE_HEADERS})
+target_link_libraries(optimal_packing ${CGALLIB} partition_constructor gurobi_mip configuration_space geometry_utils io snap)
+
 ### algorithms ###
 #add_library(dummy_algorithm SHARED src/cpp/algorithms/dummy.cpp)
 #target_link_libraries(dummy_algorithm CGAL::CGAL util)
 
 add_library(optimal_algorithm SHARED src/cpp/algorithms/optimal.cpp)
 target_precompile_headers(optimal_algorithm PUBLIC ${PRECOMPILE_HEADERS})
-target_link_libraries(optimal_algorithm ${CGALLIB} partition_constructor gurobi_mip configuration_space geometry_utils io snap)
+target_link_libraries(optimal_algorithm optimal_packing)
 
 #add_executable(mip_example src/cpp/lib2/mip_example.cpp)
 #target_link_libraries(mip_example CGAL::CGAL CGAL::SCIP_support)

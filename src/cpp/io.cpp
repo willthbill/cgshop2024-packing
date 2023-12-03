@@ -8,6 +8,7 @@
 #include "lib/util/common.h"
 
 #include "lib2/util.h"
+#include "lib/util/debug.h"
 
 #include "io.h"
 
@@ -61,7 +62,7 @@ ItemsContainer ItemsContainer::expand() {
     ItemsContainer res;
     foe(item, items) {
         rep(item.quantity) {
-            res.add_item(item.value, 1ll, item.pol, item.idx);
+            res.add_item(item.value, 1, item.pol, item.idx);
         }
     }
     return res;
@@ -75,9 +76,9 @@ Item& ItemsContainer::operator[](std::size_t i) {
 
 void PackingOutput::validate_item(Item item) {
     assert_is_integer_polygon(item.pol);
-    ASSERT(item_count[item.idx] < input.items[item.idx].quantity,"");
+    ASSERT(item_count[item.idx] < input.items[item.idx].quantity, to_string(item_count[item.idx]) + " " + to_string(input.items[item.idx].quantity));
     ASSERT(item.quantity == 1ll, "in a result all quanities must be 1");
-    ASSERT(input.items[item.idx].value == item.value,"");
+    ASSERT(input.items[item.idx].value == item.value, to_string(input.items[item.idx].value) + " " + to_string(item.value));
     ASSERT(input.items[item.idx].idx == item.idx,"");
     // ASSERT(is_polygon_inside_polygon(item.pol, input.container), "translated item " << item.idx << " is not inside container");
     get_translation(item);
@@ -140,6 +141,12 @@ bool is_point_inside(Polygon poly, Point p) {
 }
 
 void PackingOutput::validate_result() {
+    /*fon(i, sz(items)) {
+        debug("newpol");
+        foe(p, items[i].pol) {
+            debug(p);
+        }
+    }*/
     fon(i, sz(items)) {
         auto& i1 = items[i];
         fon(j, i) {
