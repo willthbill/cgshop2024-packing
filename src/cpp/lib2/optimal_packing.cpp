@@ -49,6 +49,13 @@ void assert_is_integer_polygon(Polygon& pol) {
 }
 
 
+OptimalPacking::OptimalPacking(PackingInput _input) {
+    input = _input;
+    items = input.items.expand();
+    set_problem(&problem);
+    cout << "[c++] Number of expanded items: " << sz(items) << endl;
+}
+
 MIPVariable OptimalPacking::get_ref_coord_variable_x(int idx) {
     return {"int", "polygon_ref_" + to_string(idx) +  "_x"};
 }
@@ -58,7 +65,7 @@ MIPVariable OptimalPacking::get_ref_coord_variable_y(int idx) {
 }
 
 // TODO: design is not very good, this functionality is already implemented in MIP lib
-void OptimalPacking::add_variable(Gurobi_MIP& problem, MIPVariable variable) {
+void OptimalPacking::add_variable(MIPVariable variable) {
     string type = variable.first;
     if(type == "con") {
         problem.add_continuous_variable(variable.second);
@@ -72,15 +79,22 @@ void OptimalPacking::add_variable(Gurobi_MIP& problem, MIPVariable variable) {
 }
 
 // TODO: design is not very good, this functionality is already implemented in MIP lib
-void OptimalPacking::add_constraint(Gurobi_MIP& problem, MIPConstraint constraint) {
-    if(get<1>(constraint) == "eq") {
-        problem.add_eq_constraint(get<0>(constraint), get<2>(constraint));
-    } else if(get<1>(constraint) == "geq") {
-        problem.add_geq_constraint(get<0>(constraint), get<2>(constraint));
-    } else if(get<1>(constraint) == "leq") {
-        problem.add_leq_constraint(get<0>(constraint), get<2>(constraint));
+void OptimalPacking::add_constraint(
+    MIPConstraint constraint,
+    bool lazy=false
+) {
+    if(lazy) {
+        add_lazy_constraint(get<0>(constraint), get<2>(constraint), get<1>(constraint));
     } else {
-        assert(false);
+        if(get<1>(constraint) == "eq") {
+            problem.add_eq_constraint(get<0>(constraint), get<2>(constraint));
+        } else if(get<1>(constraint) == "geq") {
+            problem.add_geq_constraint(get<0>(constraint), get<2>(constraint));
+        } else if(get<1>(constraint) == "leq") {
+            problem.add_leq_constraint(get<0>(constraint), get<2>(constraint));
+        } else {
+            assert(false);
+        }
     }
 }
 
@@ -207,15 +221,40 @@ vector<MIPConstraint> OptimalPacking::get_constraints_point_inside_convex_polygo
     return res;
 }
 
-PackingOutput OptimalPacking::run_inner(PackingInput input) {
-    auto items = input.items.expand();
+void OptimalPacking::callback() {
+    try {
+        if (where == GRB_CB_MIPSOL) {
 
-    cout << "[c++] Number of expanded items: " << sz(items) << endl;
+            // Logic for adding lazy constraints
+            // For instance, check if any route exceeds capacity and add a constraint if it does
 
-    Gurobi_MIP problem;
-    vector<MIPVariable> in_use_binaries;
+            // Pseudo-code:
+            // if (new capacity constraint needed) {
+            //     model->addConstr(...);
+            // }
 
+        } else if (where == GRB_CB_MIPNODE && getIntInfo(GRB_CB_MIPNODE_STATUS) == GRB_OPTIMAL) {
+            // Logic for adding variables
+            // For instance, check if a new route has become relevant and add it if necessary
+
+            // Pseudo-code:
+            // if (new route is relevant) {
+            //     GRBVar newVar = model->addVar(...);
+            //     // Update model or constraints to include new variable
+            //     model->update();
+            // }
+        }
+    } catch (GRBException e) {
+        std::cout << "Error number: " << e.getErrorCode() << std::endl;
+        std::cout << e.getMessage() << std::endl;
+    } catch (...) {
+        std::cout << "Error during callback" << std::endl;
+    }
+}
+
+PackingOutput OptimalPacking::run_inner(bool lazy) {
     cout << "[c++] Adding 'in-use' binaries" << endl;
+    vector<MIPVariable> in_use_binaries;
     {
         fon(i, sz(items)) {
             in_use_binaries.push_back(
@@ -224,7 +263,7 @@ PackingOutput OptimalPacking::run_inner(PackingInput input) {
                     string("is_polygon_" + to_string(i) + "_in_use")
                 )
             );
-            add_variable(problem, in_use_binaries[i]);
+            add_variable(in_use_binaries[i]);
         }
     }
 
@@ -240,8 +279,8 @@ PackingOutput OptimalPacking::run_inner(PackingInput input) {
     cout << "[c++] Adding reference x and y variables" << endl;
     {
         fon(i, sz(items)) {
-            add_variable(problem, get_ref_coord_variable_x(i));
-            add_variable(problem, get_ref_coord_variable_y(i));
+            add_variable(get_ref_coord_variable_x(i));
+            add_variable(get_ref_coord_variable_y(i));
         }
     }
 
@@ -254,24 +293,28 @@ PackingOutput OptimalPacking::run_inner(PackingInput input) {
             foe(constraint, get_constraints_point_inside_convex_polygon(
                 input.container, x, y, in_use_binaries[i], p - ref
             )) {
-                add_constraint(problem, constraint);
+                add_constraint(constraint);
             }
         }
     }
 
-    cout << "[c++] Adding items no overlap constraints" << endl;
-    fon(i, sz(items)) {
-        fon(j, i) {
-            auto [variables, constraints] = get_iteminitem_constraints(
-                make_pair(get_ref_coord_variable_x(j), get_ref_coord_variable_y(j)),
-                make_pair(get_ref_coord_variable_x(i), get_ref_coord_variable_y(i)),
-                items[j],
-                items[i],
-                "binary_" + to_string(i) + "_" + to_string(j) + "_",
-                {in_use_binaries[j], in_use_binaries[i]}
-            );
-            foe(v, variables) add_variable(problem, v);
-            foe(c, constraints) add_constraint(problem, c);
+    if(lazy) {
+        problem.set_callback(this);
+    } else {
+        cout << "[c++] Adding items no overlap constraints" << endl;
+        fon(i, sz(items)) {
+            fon(j, i) {
+                auto [variables, constraints] = get_iteminitem_constraints(
+                    make_pair(get_ref_coord_variable_x(j), get_ref_coord_variable_y(j)),
+                    make_pair(get_ref_coord_variable_x(i), get_ref_coord_variable_y(i)),
+                    items[j],
+                    items[i],
+                    "binary_" + to_string(i) + "_" + to_string(j) + "_",
+                    {in_use_binaries[j], in_use_binaries[i]}
+                );
+                foe(v, variables) add_variable(v);
+                foe(c, constraints) add_constraint(c);
+            }
         }
     }
 
@@ -294,13 +337,14 @@ PackingOutput OptimalPacking::run_inner(PackingInput input) {
     return output;
 }
 
-PackingOutput OptimalPacking::run(PackingInput input) {
+PackingOutput OptimalPacking::run() {
     cout << "[c++] Scaling input" << endl;
     PackingInput modified_input {
         scale_polygon(input.container, scale),
         scale_items(input.items, scale),
     };
-    PackingOutput output = run_inner(modified_input);
+    input = modified_input;
+    PackingOutput output = run_inner();
     cout << "[c++] Unscaling input" << endl;
     output.items = scale_items(output.items, 1.0/scale);
     cout << "[c++] Result found" << endl;

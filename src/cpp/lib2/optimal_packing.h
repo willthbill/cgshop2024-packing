@@ -11,17 +11,27 @@ typedef std::pair<std::string,std::string> MIPVariable;
 //                                            string should be MIPVariable
 typedef std::tuple<std::vector<std::pair<std::string, FT>>, std::string, FT> MIPConstraint;
 
-class OptimalPacking {
+class OptimalPacking : public GurobiCallback {
+
+private:
+
+    PackingInput input;
+    ItemsContainer items;
+    Gurobi_MIP problem;
 
 public:
+
+    OptimalPacking(PackingInput input);
 
     MIPVariable get_ref_coord_variable_x(int idx); 
 
     MIPVariable get_ref_coord_variable_y(int idx); 
 
-    void add_variable(Gurobi_MIP& problem, MIPVariable constraint); 
+    void add_variable(MIPVariable constraint); 
 
-    void add_constraint(Gurobi_MIP& problem, MIPConstraint constraint); 
+    void add_constraint(MIPConstraint constraint, bool lazy); 
+
+    void callback() override;
 
     std::pair<std::vector<MIPVariable>, std::vector<MIPConstraint>> get_iteminitem_constraints(
         std::pair<MIPVariable, MIPVariable> p1,
@@ -40,8 +50,8 @@ public:
         Vector offset // the point (var_x, var_y) + offset
     );
 
-    PackingOutput run_inner(PackingInput input); 
+    PackingOutput run_inner(bool lazy = false); 
 
-    PackingOutput run(PackingInput input); 
+    PackingOutput run(); 
 
 };

@@ -49,6 +49,41 @@ ll get_ll(FT v) {
     return numerator;
 }
 
+void GurobiCallback::set_problem(Gurobi_MIP* _problem) {
+    problem = _problem;
+}
+
+void GurobiCallback::add_lazy_constraint(
+    std::vector<std::pair<std::string,FT>> a,
+    FT b,
+    std::string type
+) {
+    foe(p, a) {
+        ASSERT(problem->vars.count(p.fi) == 1, "variable " << p.fi << " was not created");
+    }
+    problem->constraints[type].pb({a,b});
+    GRBLinExpr expr = 0;
+    foe(p, a) {
+        expr += problem->vars[p.fi] * get_ll(p.se);
+    }
+    if(type == "eq") {
+        addLazy(expr, GRB_EQUAL, get_ll(b));
+    } else if(type == "leq") {
+        addLazy(expr, GRB_LESS_EQUAL, get_ll(b));
+    } else if(type == "geq") {
+        addLazy(expr, GRB_GREATER_EQUAL, get_ll(b));
+    } else {
+        ASSERT(false, "unknown constraint type " << type);
+    }
+}
+
+void Gurobi_MIP::set_callback(
+    GurobiCallback* _callbackobj
+) {
+    callbackobj = _callbackobj;
+    solver.setCallback(callbackobj);
+}
+
 void Gurobi_MIP::_add_constraint(vector<pair<string,FT>> a, FT b, string type) {
     foe(p, a) {
         ASSERT(vars.count(p.fi) == 1, "variable " << p.fi << " was not created");
@@ -115,6 +150,16 @@ void Gurobi_MIP::_set_objective(string type, vector<pair<string,FT>> c) {
     // get_status(solver);
 }
 
+
+map<string,FT> Gurobi_MIP::get_values() {
+    map<string,FT> res;
+    foe(p, vars) {
+        assert(p.fi == p.se.get(GRB_StringAttr_VarName));
+        res[p.fi] = p.se.get(GRB_DoubleAttr_X);
+    }
+    return res;
+}
+
 // TODO: we can iterate over multiple solutions
 map<string,FT> Gurobi_MIP::solve() {
 
@@ -147,12 +192,8 @@ map<string,FT> Gurobi_MIP::solve() {
       ASSERT(false, "Optimization was stopped with status = " << optimstatus);
     }
 
-    map<string,FT> res;
-    foe(p, vars) {
-        assert(p.fi == p.se.get(GRB_StringAttr_VarName));
-        res[p.fi] = p.se.get(GRB_DoubleAttr_X); // TODO: get int for integer vars and bools
-        debug(p.fi);
-    }
+    map<string,FT> res = get_values();
+
     double tol = 1e-3;
     foe(c, constraints["eq"]) {
         FT lhs = 0;
