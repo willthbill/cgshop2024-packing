@@ -48,22 +48,22 @@ ll get_ll(FT v) {
     return numerator;
 }
 
-void GurobiCallback::set_problem(Gurobi_MIP* _problem) {
-    problem = _problem;
+void GurobiCallback::cb_set_problem(Gurobi_MIP* _problem) {
+    cb_problem = _problem;
 }
 
-void GurobiCallback::add_lazy_constraint(
+void GurobiCallback::cb_add_lazy_constraint(
     std::vector<std::pair<std::string,FT>> a,
     FT b,
     std::string type
 ) {
     foe(p, a) {
-        ASSERT(problem->vars.count(p.fi) == 1, "variable " << p.fi << " was not created");
+        ASSERT(cb_problem->vars.count(p.fi) == 1, "variable " << p.fi << " was not created");
     }
-    problem->constraints[type].pb({a,b});
+    cb_problem->constraints[type].pb({a,b});
     GRBLinExpr expr = 0;
     foe(p, a) {
-        expr += problem->vars[p.fi] * get_ll(p.se);
+        expr += cb_problem->vars[p.fi] * get_ll(p.se);
     }
     if(type == "eq") {
         addLazy(expr, GRB_EQUAL, get_ll(b));

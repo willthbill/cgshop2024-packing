@@ -15,15 +15,15 @@ class GurobiCallback: public GRBCallback {
 
 private:
 
-    Gurobi_MIP* problem;
+    Gurobi_MIP* cb_problem;
 
 public:
 
     virtual void callback() = 0;
 
-    void set_problem(Gurobi_MIP* _problem); 
+    void cb_set_problem(Gurobi_MIP* _problem); 
 
-    void add_lazy_constraint(
+    void cb_add_lazy_constraint(
         std::vector<std::pair<std::string,FT>> a,
         FT b,
         std::string type
