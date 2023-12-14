@@ -18,6 +18,8 @@ private:
     PackingInput input;
     ItemsContainer items;
     Gurobi_MIP problem;
+    std::vector<MIPVariable> in_use_binaries;
+    std::set<std::pair<int,int>> itempair_state;
 
 public:
 
@@ -39,7 +41,8 @@ public:
         Item item1,
         Item item2, // item2 should not be in item1
         std::string binary_prefix,
-        std::vector<MIPVariable> enabled
+        std::vector<MIPVariable> enabled,
+        bool use_bounding_boxes
     ); 
 
     std::vector<MIPConstraint> get_constraints_point_inside_convex_polygon(

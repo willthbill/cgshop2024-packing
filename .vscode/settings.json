@@ -13,6 +13,9 @@
         "tuple": "cpp",
         "utility": "cpp",
         "variant": "cpp",
-        "chrono": "cpp"
+        "chrono": "cpp",
+        "bitset": "cpp",
+        "string_view": "cpp",
+        "stacktrace": "cpp"
     }
 }

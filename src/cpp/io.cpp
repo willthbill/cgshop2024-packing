@@ -128,12 +128,12 @@ bool is_completely_inside(Polygon a, Polygon b) {
     return res == b.area();
 }
 
-bool is_point_inside(Polygon poly, Point p) {
+bool is_point_strictly_inside(Polygon poly, Point p) {
     switch (CGAL::bounded_side_2(poly.vertices_begin(), poly.vertices_end(), p)) {
         case CGAL::ON_BOUNDED_SIDE:
             return true;
         case CGAL::ON_BOUNDARY:
-            return true;
+            return false;
         case CGAL::ON_UNBOUNDED_SIDE:
             return false;
     }
@@ -155,7 +155,7 @@ void PackingOutput::validate_result() {
             if(!is_completely_outside(i1.pol, i2.pol)) {
                 cout << "!!!!! OVERLAP BETWEEN ITEMS IN SOLUTION !!!!!" << endl;
             }
-            if(is_point_inside(i1.pol, i2.get_reference_point())) {
+            if(is_point_strictly_inside(i1.pol, i2.get_reference_point())) {
                 cout << "!!!!! ITEM REFERENCE POINT IS INSIDE OTHER ITEM !!!!!" << endl;
             }
         }

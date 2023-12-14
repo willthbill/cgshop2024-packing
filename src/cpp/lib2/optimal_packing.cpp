@@ -98,29 +98,59 @@ void OptimalPacking::add_constraint(
     }
 }
 
+Polygon get_bounding_box(Polygon& pol) {
+    FT mnx = biginf, mxx = -biginf, mny = biginf, mxy = -biginf;
+    foe(p, pol) mnx = min(mnx, p.x());
+    foe(p, pol) mxx = max(mxx, p.x());
+    foe(p, pol) mny = min(mny, p.y());
+    foe(p, pol) mxy = max(mxy, p.y());
+    mnx = floor_exact(mnx);
+    mxx = ceil_exact(mxx);
+    mny = floor_exact(mny);
+    mxy = ceil_exact(mxy);
+    Polygon res;
+    res.push_back(Point(mnx, mny));
+    res.push_back(Point(mxx, mny));
+    res.push_back(Point(mxx, mxy));
+    res.push_back(Point(mnx, mxy));
+    return res;
+}
+
 pair<vector<MIPVariable>, vector<MIPConstraint>> OptimalPacking::get_iteminitem_constraints(
     pair<MIPVariable, MIPVariable> p1,
     pair<MIPVariable, MIPVariable> p2,
     Item item1,
     Item item2, // item2 should not be in item1
     string binary_prefix,
-    vector<MIPVariable> enabled
+    vector<MIPVariable> enabled,
+    bool use_bounding_box=false
 ) {
     // Compute partition
     vector<Polygon> partition;
     {
-        // Compute configuration space
-        Polygon_set disallowed (item1.pol);
-        auto config_space = ConfigurationSpace(
-            disallowed,
-            item2.pol,
-            item2.get_reference_point()
-        ).space;
-
-        // Snap it to a grid
-        auto config_space_int = get_complement(
-            SnapToGrid(get_complement(config_space)).space
-        ); // TODO: taking complement twice
+        Polygon_set config_space_int;
+        if(use_bounding_box) {
+            // Compute configuration space
+            Polygon_set disallowed (get_bounding_box(item1.pol));
+            auto bbox2 = get_bounding_box(item2.pol);
+            config_space_int = ConfigurationSpace(
+                disallowed,
+                bbox2,
+                item2.get_reference_point()
+            ).space;
+        } else {
+            // Compute configuration space
+            Polygon_set disallowed (item1.pol);
+            auto config_space = ConfigurationSpace(
+                disallowed,
+                item2.pol,
+                item2.get_reference_point()
+            ).space;
+            // Snap it to a grid
+            config_space_int = get_complement(
+                SnapToGrid(get_complement(config_space)).space
+            ); // TODO: taking complement twice
+        }
 
         // Computer intersection of large square and completement of configuration space
         Polygon square; square.pb(Point(-inf,-inf));square.pb(Point(inf,-inf));square.pb(Point(inf,inf));square.pb(Point(-inf,inf));
@@ -221,40 +251,56 @@ vector<MIPConstraint> OptimalPacking::get_constraints_point_inside_convex_polygo
     return res;
 }
 
+FT find_min_distance(const Polygon& poly1, const Polygon& poly2) {
+    FT minDist = CGAL::squared_distance(poly1[0], poly2[0]);
+    for (auto v1 = poly1.vertices_begin(); v1 != poly1.vertices_end(); ++v1) {
+        for (auto v2 = poly2.vertices_begin(); v2 != poly2.vertices_end(); ++v2) {
+            Segment seg1(*v1, *(next(v1) == poly1.vertices_end() ? poly1.vertices_begin() : next(v1)));
+            Segment seg2(*v2, *(next(v2) == poly2.vertices_end() ? poly2.vertices_begin() : next(v2)));
+            FT dist = CGAL::squared_distance(seg1, seg2);
+            if (dist < minDist) {
+                minDist = dist;
+            }
+        }
+    }
+    return std::sqrt(CGAL::to_double(minDist));
+}
+
 void OptimalPacking::callback() {
     try {
         if (where == GRB_CB_MIPSOL) {
-
-            // Logic for adding lazy constraints
-            // For instance, check if any route exceeds capacity and add a constraint if it does
-
-            // Pseudo-code:
-            // if (new capacity constraint needed) {
-            //     model->addConstr(...);
-            // }
-
-        } else if (where == GRB_CB_MIPNODE && getIntInfo(GRB_CB_MIPNODE_STATUS) == GRB_OPTIMAL) {
-            // Logic for adding variables
-            // For instance, check if a new route has become relevant and add it if necessary
-
-            // Pseudo-code:
-            // if (new route is relevant) {
-            //     GRBVar newVar = model->addVar(...);
-            //     // Update model or constraints to include new variable
-            //     model->update();
-            // }
+            cout << "feasible solution" << endl;
+            fon(i, sz(items)) {
+                fon(j, i) {
+                    if(itempair_state.count({i,j})) continue;
+                    FT dist = find_min_distance(items[i].pol, items[j].pol);
+                    if(dist <= 5) {
+                        itempair_state.insert({i,j});
+                        itempair_state.insert({j,i});
+                        auto [_, constraints] = get_iteminitem_constraints(
+                            make_pair(get_ref_coord_variable_x(j), get_ref_coord_variable_y(j)),
+                            make_pair(get_ref_coord_variable_x(i), get_ref_coord_variable_y(i)),
+                            items[j],
+                            items[i],
+                            "binary_" + to_string(i) + "_" + to_string(j) + "_",
+                            {in_use_binaries[j], in_use_binaries[i]}
+                        );
+                        foe(c, constraints) add_constraint(c, true);
+                    }
+                }
+            }
+            // problem.status();
         }
     } catch (GRBException e) {
-        std::cout << "Error number: " << e.getErrorCode() << std::endl;
+        std::cout << "[c++] Error number: " << e.getErrorCode() << std::endl;
         std::cout << e.getMessage() << std::endl;
     } catch (...) {
-        std::cout << "Error during callback" << std::endl;
+        std::cout << "[c++] Error during callback" << std::endl;
     }
 }
 
 PackingOutput OptimalPacking::run_inner(bool lazy) {
     cout << "[c++] Adding 'in-use' binaries" << endl;
-    vector<MIPVariable> in_use_binaries;
     {
         fon(i, sz(items)) {
             in_use_binaries.push_back(
@@ -300,6 +346,36 @@ PackingOutput OptimalPacking::run_inner(bool lazy) {
 
     if(lazy) {
         problem.set_callback(this);
+        cout << "[c++] Adding items no overlap constraints using bounding boxes" << endl;
+        /*fon(i, sz(items)) {
+            fon(j, i) {
+                auto [variables, constraints] = get_iteminitem_constraints(
+                    make_pair(get_ref_coord_variable_x(j), get_ref_coord_variable_y(j)),
+                    make_pair(get_ref_coord_variable_x(i), get_ref_coord_variable_y(i)),
+                    items[j],
+                    items[i],
+                    "binary_bbox_" + to_string(i) + "_" + to_string(j) + "_",
+                    {in_use_binaries[j], in_use_binaries[i]},
+                    true
+                );
+                foe(v, variables) add_variable(v);
+                foe(c, constraints) add_constraint(c);
+            }
+        }*/
+        cout << "[c++] Adding items no overlap variables" << endl;
+        fon(i, sz(items)) {
+            fon(j, i) {
+                auto [variables, constraints] = get_iteminitem_constraints(
+                    make_pair(get_ref_coord_variable_x(j), get_ref_coord_variable_y(j)),
+                    make_pair(get_ref_coord_variable_x(i), get_ref_coord_variable_y(i)),
+                    items[j],
+                    items[i],
+                    "binary_" + to_string(i) + "_" + to_string(j) + "_",
+                    {in_use_binaries[j], in_use_binaries[i]}
+                );
+                foe(v, variables) add_variable(v);
+            }
+        }
     } else {
         cout << "[c++] Adding items no overlap constraints" << endl;
         fon(i, sz(items)) {
@@ -344,7 +420,7 @@ PackingOutput OptimalPacking::run() {
         scale_items(input.items, scale),
     };
     input = modified_input;
-    PackingOutput output = run_inner();
+    PackingOutput output = run_inner(true);
     cout << "[c++] Unscaling input" << endl;
     output.items = scale_items(output.items, 1.0/scale);
     cout << "[c++] Result found" << endl;

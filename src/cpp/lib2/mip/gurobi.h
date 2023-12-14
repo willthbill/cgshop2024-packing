@@ -72,6 +72,8 @@ public:
 
     std::map<std::string,FT> solve() override; 
 
+    void status();
+
     ~Gurobi_MIP() override;
 
 };

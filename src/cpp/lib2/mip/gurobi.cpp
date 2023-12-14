@@ -28,8 +28,7 @@ Gurobi_MIP::~Gurobi_MIP(){}
 Gurobi_MIP::Gurobi_MIP() : solver(get_env()) {
 }
 
-void get_status(GRBModel& solver) {
-    std::cout << "[c++] Solving MIP" << std::endl;
+void Gurobi_MIP::status() {
     std::cout << "[c++] Number of variables: " << solver.get(GRB_IntAttr_NumVars) << std::endl;
     std::cout << "[c++] Number of binary variables: " << solver.get(GRB_IntAttr_NumBinVars) << std::endl;
     std::cout << "[c++] Number of integer variables: " << solver.get(GRB_IntAttr_NumIntVars) - solver.get(GRB_IntAttr_NumBinVars) << std::endl;
@@ -163,15 +162,16 @@ map<string,FT> Gurobi_MIP::get_values() {
 // TODO: we can iterate over multiple solutions
 map<string,FT> Gurobi_MIP::solve() {
 
-    get_status(solver);
+    status();
 
     // solver.set(GRB_DoubleParam_Cutoff, 100);
-    solver.set(GRB_DoubleParam_MIPGap, 0.1);
+    solver.set(GRB_DoubleParam_MIPGap, 0.25);
     solver.set(GRB_IntParam_MIPFocus, 1);
     solver.set(GRB_IntParam_NumericFocus, 3);
     solver.set(GRB_IntParam_Presolve, 0);
     solver.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
     solver.set(GRB_DoubleParam_IntFeasTol, 1e-9);
+    solver.set(GRB_IntParam_LazyConstraints, 1); // TODO: only set when using lazy constraints
     solver.optimize();
 
     auto expr = solver.getObjective();//.getLinExpr();
