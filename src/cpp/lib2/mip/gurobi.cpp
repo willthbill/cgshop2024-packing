@@ -162,6 +162,7 @@ map<string,FT> Gurobi_MIP::get_values() {
 // TODO: we can iterate over multiple solutions
 map<string,FT> Gurobi_MIP::solve() {
 
+    solver.update();
     status();
 
     // solver.set(GRB_DoubleParam_Cutoff, 100);
@@ -228,4 +229,11 @@ void Gurobi_MIP::set_warm_start(std::map<std::string,FT>& sol) {
         auto& var = vars[p.fi];
         var.set(GRB_DoubleAttr_Start, p.se.to_double());
     }
+    solver.update();
+}
+
+void Gurobi_MIP::fix_variable(std::string var, FT value) {
+    vars[var].set(GRB_DoubleAttr_LB, value.to_double());
+    vars[var].set(GRB_DoubleAttr_UB, value.to_double());
+    solver.update();
 }

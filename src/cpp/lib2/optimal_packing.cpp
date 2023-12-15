@@ -570,6 +570,14 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
         }
 
         problem.set_warm_start(solution);
+        fon(i, sz(subset)) {
+            if(!solution.count(in_use_binaries[i].se)) continue;
+            if(solution[in_use_binaries[i].se] > 0.5) {
+                problem.fix_variable(in_use_binaries[i].se, 1);
+            } else {
+                // problem.fix_variable(in_use_binaries[i].se, 0); // TODO: maybe delete
+            }
+        }
 
         cout << "[c++] Computing solution using MIP" << endl;
         solution = problem.solve();
