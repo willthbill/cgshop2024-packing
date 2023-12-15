@@ -109,9 +109,9 @@ public:
             assert(false);
         }
     }
-    vector<pair<MIPVariable, MIPVariable>> (vector<Item>& items) {
+    vector<pair<MIPVariable, MIPVariable>> get_and_add_xy_ref_variables(int number_of_items) {
         vector<pair<MIPVariable, MIPVariable>> xys;
-        fon(i, sz(items)) {
+        fon(i, number_of_items) {
             auto x = get_ref_coord_variable_x(i);
             auto y = get_ref_coord_variable_y(i);
             add_variable(x);
@@ -120,12 +120,12 @@ public:
         }
         return xys;
     }
-    void OptimalPacking::add_constraint(
+    void add_constraint(
         MIPConstraint constraint,
         bool lazy=false
     ) {
         if(lazy) {
-            callbackobj->add_lazy_constraint(get<0>(constraint), get<2>(constraint), get<1>(constraint));
+            callbackobj->cb_add_lazy_constraint(get<0>(constraint), get<2>(constraint), get<1>(constraint));
         } else {
             if(get<1>(constraint) == "eq") {
                 problem->add_eq_constraint(get<0>(constraint), get<2>(constraint));
@@ -138,16 +138,17 @@ public:
             }
         }
     }
-    void set_max_objective_with_in_use_binaries(vector<MIPVariable> in_use_binaries) {
+    void set_max_objective_with_in_use_binaries(ItemsContainer& items, vector<MIPVariable>& in_use_binaries) {
+        assert(sz(items) == sz(in_use_binaries));
         vector<pair<string,FT>> obj_terms;
         fon(i, sz(items)) {
-            obj_terms.push_back({in_use_binaries[i].se, input.items[i].value});
+            obj_terms.push_back({in_use_binaries[i].se, items[i].value});
         }
         problem->set_max_objective(obj_terms);
     }
-    vector<MIPVariable> get_and_add_in_use_binaries() {
+    vector<MIPVariable> get_and_add_in_use_binaries(int number_of_items) {
         vector<MIPVariable> in_use_binaries;
-        fon(i, sz(items)) {
+        fon(i, number_of_items) {
             in_use_binaries.push_back(
                 make_pair(
                     string("bin"),
@@ -158,11 +159,11 @@ public:
         }
         return in_use_binaries;
     }
-    pair<vector<MIPVariable>, vector<MIPConstraint>> OptimalPacking::get_iteminitem_constraints(
-        pair<MIPVariable, MIPVariable> p1,
-        pair<MIPVariable, MIPVariable> p2,
-        Item item1,
-        Item item2, // item2 should not be in item1
+    pair<vector<MIPVariable>, vector<MIPConstraint>> get_iteminitem_constraints(
+        pair<MIPVariable, MIPVariable>& p1,
+        pair<MIPVariable, MIPVariable>& p2,
+        Item& item1,
+        Item& item2, // item2 should not be in item1
         string binary_prefix,
         vector<MIPVariable> enabled,
         bool use_bounding_box=false
@@ -270,11 +271,11 @@ public:
         return {variables, constraints};
     }
 
-    vector<MIPConstraint> OptimalPacking::get_constraints_point_inside_convex_polygon(
+    vector<MIPConstraint> get_constraints_point_inside_convex_polygon(
         Polygon& pol,
-        MIPVariable var_x,
-        MIPVariable var_y,
-        MIPVariable binary, // whether the constraints should be enabled
+        MIPVariable& var_x,
+        MIPVariable& var_y,
+        MIPVariable& binary, // whether the constraints should be enabled
         Vector offset // the point (var_x, var_y) + offset
     ) {
         ASSERT(pol.orientation() == CGAL::COUNTERCLOCKWISE, "must have counterclockwise orientation");
@@ -295,7 +296,7 @@ public:
 
     void add_constraints_inside_convex_polygon(
         Polygon& pol,
-        vector<Item>& items,
+        ItemsContainer& items,
         vector<MIPVariable>& in_use_binaries,
         vector<pair<MIPVariable,MIPVariable>>& xy_ref_variables
     ) {
@@ -313,12 +314,12 @@ public:
         }
     }
     void add_bbox_constraints(
-        pair<MIPVariable,MIPVariable> xy_1,
-        pair<MIPVariable,MIPVariable> xy_2,
-        Item item1,
-        Item item2,
+        pair<MIPVariable,MIPVariable>& xy_1,
+        pair<MIPVariable,MIPVariable>& xy_2,
+        Item& item1,
+        Item& item2,
         string uniqueness,
-        string inuse1, string inuse2,
+        MIPVariable& inuse1, MIPVariable& inuse2,
         bool add_vars=true, bool add_cons=true
     ) {
         auto [variables, constraints] = get_iteminitem_constraints(
@@ -327,7 +328,7 @@ public:
             item1,
             item2,
             "binary_bbox_" + uniqueness + "_",
-            {inuse1, inuse2},
+            vector<MIPVariable>{inuse1, inuse2},
             true
         );
         if(add_vars) foe(v, variables) add_variable(v);
@@ -335,12 +336,12 @@ public:
     }
 
     void add_exact_constraints(
-        pair<MIPVariable,MIPVariable> xy_1,
-        pair<MIPVariable,MIPVariable> xy_2,
-        Item item1,
-        Item item2,
+        pair<MIPVariable,MIPVariable>& xy_1,
+        pair<MIPVariable,MIPVariable>& xy_2,
+        Item& item1,
+        Item& item2,
         string uniqueness,
-        string inuse1, string inuse2,
+        MIPVariable& inuse1, MIPVariable& inuse2,
         bool add_vars=true, bool add_cons=true
     ) {
         auto [variables, constraints] = get_iteminitem_constraints(
@@ -349,39 +350,53 @@ public:
             item1,
             item2,
             "binary_exact_" + uniqueness + "_",
-            {inuse1, inuse2}
+            vector<MIPVariable>{inuse1, inuse2}
         );
         if(add_vars) foe(v, variables) add_variable(v);
         if(add_cons) foe(c, constraints) add_constraint(c);
     };
 
+    PackingOutput produce_output(
+        PackingInput& input,
+        ItemsContainer& items,
+        map<string,FT>& solution,
+        vector<MIPVariable>& in_use_binaries,
+        vector<pair<MIPVariable,MIPVariable>>& xys
+    ) {
+        PackingOutput output (input);
+        fon(i, sz(items)) {
+            if(solution[in_use_binaries[i].se] > 0.5) {
+                FT x = solution[xys[i].fi.se];
+                FT y = solution[xys[i].se.se];
+                Item new_item = items[i].move_ref_point(Point(x,y));
+                output.add_item(new_item);
+            }
+        }
+        return output;
+    }
+
 };
 
 
-OptimalPacking::OptimalPacking(PackingInput _input) {
-    input = _input;
-}
-
-void OptimalPacking::callback() {
+void OptimalPackingCallback::callback() {
     try {
         if (where == GRB_CB_MIPSOL) {
             cout << "feasible solution" << endl;
+            auto& items = cb_input.items;
+            MIPPackingHelpers helper (&cb_problem, this);
             fon(i, sz(items)) {
                 fon(j, i) {
-                    if(itempair_state.count({i,j})) continue;
+                    if(cb_itempair_state.count({i,j})) continue;
                     FT dist = find_min_distance(items[i].pol, items[j].pol);
                     if(dist <= 5) {
-                        itempair_state.insert({i,j});
-                        itempair_state.insert({j,i});
-                        auto [_, constraints] = get_iteminitem_constraints(
-                            make_pair(get_ref_coord_variable_x(j), get_ref_coord_variable_y(j)),
-                            make_pair(get_ref_coord_variable_x(i), get_ref_coord_variable_y(i)),
-                            items[j],
-                            items[i],
-                            "binary_" + to_string(i) + "_" + to_string(j) + "_",
-                            {in_use_binaries[j], in_use_binaries[i]}
+                        cb_itempair_state.insert({i,j});
+                        cb_itempair_state.insert({j,i});
+                        helper.add_exact_constraints(
+                            cb_xys[i], cb_xys[j], items[i], items[j],
+                            to_string(i) + "_" + to_string(j),
+                            cb_in_use_binaries[i], cb_in_use_binaries[j],
+                            false, true
                         );
-                        foe(c, constraints) add_constraint(c, true);
                     }
                 }
             }
@@ -395,56 +410,102 @@ void OptimalPacking::callback() {
     }
 }
 
-PackingOutput OptimalPacking::run_inner(PackingInput _input) {
+PackingOutput OptimalPackingCallback::run(PackingInput _input) {
 
-    if(configuration == "lazy_with_callback") {
-        cout << "[c++] Optimal algorithm using configuration=lazy_with_callback" << endl;
-        cb_input = {input.container, input.items.expand()};
-        cb_set_problem(&cb_problem);
-        cout << "[c++] Adding 'in-use' binaries" << endl;
-        cb_in_use_binaries = get_and_add_in_use_binaries();
-        cout << "[c++] Setting objective" << endl;
-        set_max_objective_with_in_use_binaries(cb_in_use_binaries);
-        cout << "[c++] Adding reference x and y variables" << endl;
-        auto xy_vars = get_and_add_xy_variables();
-        cout << "[c++] Adding items inside container constraints" << endl;
-        add_constraints_inside_convex_polygon(cb_input.container, cb_input.items, cb_in_use_binaries, xy_vars);
-        cb_problem.set_callback(this);
-        cout << "[c++] Adding items no overlap constraints using bounding boxes" << endl;
-        fon(i, sz(items)) fon(j, i) add_bbox_constraints(i,j);
-        cout << "[c++] Adding items no overlap variables" << endl;
-        fon(i, sz(items)) fon(j, i) add_exact_constraints(i,j,true,false);
-    } else if(configuration == "slow") {
-        // create a mip problem and dothe above but without the callback
-        MIP_Solver problem;
-    } else {
+    cout << "[c++] Optimal algorithm using gurobi callback optimization" << endl;
+    cb_input = {_input.container, _input.items.expand()};
+
+    cb_set_problem(&cb_problem);
+    cb_problem.set_callback(this);
+    MIPPackingHelpers helper (&cb_problem, this);
+
+    cout << "[c++] Adding 'in-use' binaries" << endl;
+    cb_in_use_binaries = helper.get_and_add_in_use_binaries(sz(cb_input.items));
+
+    cout << "[c++] Setting objective" << endl;
+    helper.set_max_objective_with_in_use_binaries(cb_input.items, cb_in_use_binaries);
+
+    cout << "[c++] Adding reference x and y variables" << endl;
+    cb_xys = helper.get_and_add_xy_ref_variables(sz(cb_input.items));
+
+    cout << "[c++] Adding items inside container constraints" << endl;
+    helper.add_constraints_inside_convex_polygon(cb_input.container, cb_input.items, cb_in_use_binaries, cb_xys);
+
+    cout << "[c++] Adding items no overlap constraints using bounding boxes" << endl;
+    fon(i, sz(cb_input.items)) fon(j, i) {
+        helper.add_bbox_constraints(
+            cb_xys[i], cb_xys[j], cb_input.items[i], cb_input.items[j],
+            to_string(i) + "_" + to_string(j),
+            cb_in_use_binaries[i], cb_in_use_binaries[j]
+        );
     }
-    if(lazy) {
-    } else {
-        cout << "[c++] Adding items no overlap constraints" << endl;
-        fon(i, sz(items)) fon(j, i) add_exact_constraints(i,j);
+
+    cout << "[c++] Adding items no overlap variables" << endl;
+    fon(i, sz(cb_input.items)) fon(j, i) {
+        helper.add_exact_constraints(
+            cb_xys[i], cb_xys[j], cb_input.items[i], cb_input.items[j],
+            to_string(i) + "_" + to_string(j),
+            cb_in_use_binaries[i], cb_in_use_binaries[j],
+            true, false
+        );
+    }
+
+    cout << "[c++] Computing solution using MIP" << endl;
+    auto solution = cb_problem.solve();
+
+    cout << "[c++] Moving items to found reference point solution coordinates" << endl;
+    PackingOutput output = helper.produce_output(_input, cb_input.items, solution, cb_in_use_binaries, cb_xys);
+
+    return output;
+}
+
+
+PackingOutput OptimalPackingSlow::run(PackingInput _input) {
+
+    cout << "[c++] Optimal slow algorithm" << endl;
+    PackingInput input {
+        _input.container,
+        _input.items.expand()
+    };
+
+    cout << "heyo1" << endl;
+    Gurobi_MIP problem;
+    cout << "heyo2" << endl;
+    MIPPackingHelpers helper (&problem, NULL);
+
+    cout << "[c++] Adding 'in-use' binaries" << endl;
+    auto in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
+
+    cout << "[c++] Setting objective" << endl;
+    helper.set_max_objective_with_in_use_binaries(input.items, in_use_binaries);
+
+    cout << "[c++] Adding reference x and y variables" << endl;
+    auto xys = helper.get_and_add_xy_ref_variables(sz(input.items));
+
+    cout << "[c++] Adding items inside container constraints" << endl;
+    helper.add_constraints_inside_convex_polygon(input.container, input.items, in_use_binaries, xys);
+
+    cout << "[c++] Adding items no overlap variables and constraints" << endl;
+    fon(i, sz(input.items)) fon(j, i) {
+        helper.add_exact_constraints(
+            xys[i], xys[j], input.items[i], input.items[j],
+            to_string(i) + "_" + to_string(j),
+            in_use_binaries[i], in_use_binaries[j]
+        );
     }
 
     cout << "[c++] Computing solution using MIP" << endl;
     auto solution = problem.solve();
 
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
-    PackingOutput output (input);
-    fon(i, sz(items)) {
-        if(solution[in_use_binaries[i].se] > 0.5) {
-            auto xkey = get_ref_coord_variable_x(i).second;
-            auto ykey = get_ref_coord_variable_y(i).second;
-            FT x = solution[xkey];
-            FT y = solution[ykey];
-            Item new_item = items[i].move_ref_point(Point(x,y));
-            output.add_item(new_item);
-        }
-    }
+    PackingOutput output = helper.produce_output(_input, input.items, solution, in_use_binaries, xys);
 
     return output;
 }
 
-PackingOutput OptimalPacking::run() {
+
+// Will scaling ever be useful?
+/*PackingOutput OptimalPacking::run() {
     cout << "[c++] Scaling input" << endl;
     PackingInput modified_input {
         scale_polygon(input.container, scale),
@@ -456,4 +517,4 @@ PackingOutput OptimalPacking::run() {
     output.items = scale_items(output.items, 1.0/scale);
     cout << "[c++] Result found" << endl;
     return output;
-}
+}*/

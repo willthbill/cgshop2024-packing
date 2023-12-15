@@ -88,6 +88,7 @@ Polygon SnapToGrid::snap(Polygon pol) {
 
     {
         int before = res.size();
+        int tried = 0;
         while(true) {
             bool found = false;
             for(int i = 0; i < sz(res); i++) {
@@ -99,8 +100,14 @@ Polygon SnapToGrid::snap(Polygon pol) {
                     newres.push_back(p);
                 }
                 if(sz(newres) <= 2) continue;
+                tried++;
                 if(!newres.is_simple()) continue;
-                if(newres.area() > res.area()) continue;
+                FT dist = 1e18;
+                for(int j = 0; j < sz(res); j++) {
+                    if(i == j) continue;
+                    dist = min(dist, CGAL::squared_distance(res[i], res[j]));
+                }
+                if(newres.area() > res.area() && dist >= 3) continue;
                 if(is_completely_inside(newres, pol)) {
                     found = true;
                     res = newres;
@@ -109,6 +116,7 @@ Polygon SnapToGrid::snap(Polygon pol) {
             if(!found) break;
         }
         int after = res.size();
+        cout << "snapper tried " << tried << " times" << endl;
         cout << "snapper optimization: " << sz(pol) << " -> " << before << " -> " << after << " (diff = " << before - after << ")" << endl;
     }
 

@@ -9,6 +9,6 @@ using namespace std;
 
 PackingOutput optimal_algorithm(PackingInput input) {
     cout << "[c++] RUNNING OPTIMAL ALGORITHM" << endl;
-    return OptimalPacking(input).run();
+    return OptimalPackingSlow().run(input);
 }
 

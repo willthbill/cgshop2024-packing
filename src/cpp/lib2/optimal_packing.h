@@ -28,19 +28,18 @@ private:
     PackingInput cb_input;
     Gurobi_MIP cb_problem;
     std::vector<MIPVariable> cb_in_use_binaries;
+    std::vector<std::pair<MIPVariable,MIPVariable>> cb_xys;
     std::set<std::pair<int,int>> cb_itempair_state;
 
 public:
 
-    OptimalPacking(PackingInput input);
-
     void callback() override;
 
-    PackingOutput run(); 
+    PackingOutput run(PackingInput); 
 
 };
 
-class OptimalPackingFast {
+/*class OptimalPackingFast {
 
 private:
 
@@ -48,4 +47,4 @@ public:
 
     PackingOutput run(PackingInput); 
 
-};
+};*/

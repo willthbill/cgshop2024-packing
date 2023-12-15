@@ -4,7 +4,9 @@ source env.list
 
 xhost +local:docker
 
+# first arg is for gdb
 docker run \
+    --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
     -v .:/app/max-polygon-packing \
     -v "$CGSHOP_LIB_PATH_HOST":/app/cgshop-lib \
     -v /tmp/.X11-unix:/tmp/.X11-unix:ro \

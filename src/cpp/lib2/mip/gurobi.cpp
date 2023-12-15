@@ -165,7 +165,7 @@ map<string,FT> Gurobi_MIP::solve() {
     status();
 
     // solver.set(GRB_DoubleParam_Cutoff, 100);
-    solver.set(GRB_DoubleParam_MIPGap, 0.25);
+    solver.set(GRB_DoubleParam_MIPGap, 0.1);
     solver.set(GRB_IntParam_MIPFocus, 1);
     solver.set(GRB_IntParam_NumericFocus, 3);
     solver.set(GRB_IntParam_Presolve, 0);
