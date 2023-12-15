@@ -468,9 +468,7 @@ PackingOutput OptimalPackingSlow::run(PackingInput _input) {
         _input.items.expand()
     };
 
-    cout << "heyo1" << endl;
     Gurobi_MIP problem;
-    cout << "heyo2" << endl;
     MIPPackingHelpers helper (&problem, NULL);
 
     cout << "[c++] Adding 'in-use' binaries" << endl;
@@ -498,6 +496,87 @@ PackingOutput OptimalPackingSlow::run(PackingInput _input) {
     auto solution = problem.solve();
 
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
+    PackingOutput output = helper.produce_output(_input, input.items, solution, in_use_binaries, xys);
+
+    return output;
+}
+
+PackingOutput OptimalPackingFast::run(PackingInput _input) {
+
+    cout << "[c++] Optimal fast algorithm" << endl;
+    PackingInput input {
+        _input.container,
+        _input.items.expand()
+    };
+
+    sort(input.items.begin(), input.items.end(), [](Item& a, Item& b) {
+        return a.value / a.pol.area() > b.value / b.pol.area();
+    });
+
+    cout << "[c++] Sorting:" << endl;
+    foe(item, input.items) {
+        cout << "    " << item.value << " " << item.pol.area() << " " << (item.value / item.pol.area()).to_double() << endl;
+    }
+
+    map<string,FT> solution;
+    vector<MIPVariable> in_use_binaries;
+    vector<pair<MIPVariable,MIPVariable>> xys;
+    map<pair<int,int>,pair<vector<MIPVariable>, vector<MIPConstraint>>> iteminitem_constraints;
+    {
+        Gurobi_MIP problem;
+        MIPPackingHelpers helper (&problem, NULL);
+        in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
+        xys = helper.get_and_add_xy_ref_variables(sz(input.items));
+        fon(i, sz(input.items)) fon(j, i) {
+            auto [variables, constraints] = helper.get_iteminitem_constraints(
+                xys[i],
+                xys[j],
+                input.items[i],
+                input.items[j],
+                "binary_exact_" + to_string(i) + "_" + to_string(j) + "_",
+                vector<MIPVariable>{in_use_binaries[i], in_use_binaries[j]}
+            );
+            iteminitem_constraints[{i,j}] = {variables, constraints};
+            iteminitem_constraints[{j,i}] = {variables, constraints};
+        }
+    }
+    fon(i, sz(input.items)) {
+        auto& item = input.items[i];
+
+        ItemsContainer subset;
+        fon(j, i + 1) subset.add_item(input.items[j]);
+
+        Gurobi_MIP problem;
+        MIPPackingHelpers helper (&problem, NULL);
+
+        cout << "[c++] Adding 'in-use' binaries" << endl;
+        in_use_binaries = helper.get_and_add_in_use_binaries(sz(subset));
+
+        cout << "[c++] Setting objective" << endl;
+        helper.set_max_objective_with_in_use_binaries(subset, in_use_binaries);
+
+        cout << "[c++] Adding reference x and y variables" << endl;
+        xys = helper.get_and_add_xy_ref_variables(sz(subset));
+
+        cout << "[c++] Adding items inside container constraints" << endl;
+        helper.add_constraints_inside_convex_polygon(input.container, subset, in_use_binaries, xys);
+
+        cout << "[c++] Adding items no overlap variables and constraints" << endl;
+        fon(i, sz(subset)) fon(j, i) {
+            auto& vars = iteminitem_constraints[{i,j}].fi;
+            auto& cons = iteminitem_constraints[{i,j}].se;
+            foe(v, vars) helper.add_variable(v);
+            foe(c, cons) helper.add_constraint(c);
+        }
+
+        problem.set_warm_start(solution);
+
+        cout << "[c++] Computing solution using MIP" << endl;
+        solution = problem.solve();
+    }
+
+    cout << "[c++] Moving items to found reference point solution coordinates" << endl;
+    MIPPackingHelpers helper (NULL, NULL);
     PackingOutput output = helper.produce_output(_input, input.items, solution, in_use_binaries, xys);
 
     return output;

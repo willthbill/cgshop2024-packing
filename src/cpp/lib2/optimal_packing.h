@@ -39,7 +39,7 @@ public:
 
 };
 
-/*class OptimalPackingFast {
+class OptimalPackingFast {
 
 private:
 
@@ -47,4 +47,4 @@ public:
 
     PackingOutput run(PackingInput); 
 
-};*/
+};

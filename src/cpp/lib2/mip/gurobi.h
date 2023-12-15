@@ -74,6 +74,8 @@ public:
 
     void status();
 
+    void set_warm_start(std::map<std::string,FT>& sol);
+
     ~Gurobi_MIP() override;
 
 };

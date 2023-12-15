@@ -168,10 +168,12 @@ map<string,FT> Gurobi_MIP::solve() {
     solver.set(GRB_DoubleParam_MIPGap, 0.1);
     solver.set(GRB_IntParam_MIPFocus, 1);
     solver.set(GRB_IntParam_NumericFocus, 3);
-    solver.set(GRB_IntParam_Presolve, 0);
+    solver.set(GRB_IntParam_Presolve, 2);
     solver.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
     solver.set(GRB_DoubleParam_IntFeasTol, 1e-9);
-    solver.set(GRB_IntParam_LazyConstraints, 1); // TODO: only set when using lazy constraints
+    solver.set(GRB_IntParam_LPWarmStart, 2);
+    solver.set(GRB_DoubleParam_Heuristics, 0.5);
+    // solver.set(GRB_IntParam_LazyConstraints, 1); // TODO: only set when using lazy constraints
     solver.optimize();
 
     auto expr = solver.getObjective();//.getLinExpr();
@@ -219,3 +221,11 @@ map<string,FT> Gurobi_MIP::solve() {
     return res;
 }
 
+
+void Gurobi_MIP::set_warm_start(std::map<std::string,FT>& sol) {
+    cout << "[c++] " << "Using warm start" << endl;
+    foe(p, sol) {
+        auto& var = vars[p.fi];
+        var.set(GRB_DoubleAttr_Start, p.se.to_double());
+    }
+}
