@@ -11,5 +11,5 @@ public:
     Polygon_set space;
     SnapToGrid(Polygon_set pset);
     Polygon get_single_polygon(); 
-    Polygon snap(Polygon pol); 
+    Polygon_with_holes snap(Polygon_with_holes pol); 
 };

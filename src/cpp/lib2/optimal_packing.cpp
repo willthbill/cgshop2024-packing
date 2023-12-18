@@ -24,21 +24,26 @@ using namespace std;
 
 const ll inf = 5000;
 const ll biginf = 1e7;
-const double scale = 1;
+const FT scale = FT(1) / FT(10000);
 const ll max_partition_size = 100000;
 
-Polygon scale_polygon(Polygon pol, double scale) {
+Polygon scale_polygon(Polygon pol, FT scale) {
     foe(e, pol) {
         e = {e.x() * scale, e.y() * scale};
     }
     return pol;
 }
 
-ItemsContainer scale_items(ItemsContainer items, double scale) {
+ItemsContainer scale_items(ItemsContainer items, FT scale) {
     foe(item, items) {
         item.pol = scale_polygon(item.pol, scale);
     }
     return items;
+}
+
+Polygon get_big_square() {
+    Polygon square; square.pb(Point(-inf,-inf));square.pb(Point(inf,-inf));square.pb(Point(inf,inf));square.pb(Point(-inf,inf));
+    return square;
 }
 
 void assert_is_integer_polygon(Polygon& pol) {
@@ -196,7 +201,7 @@ public:
             }
 
             // Computer intersection of large square and completement of configuration space
-            Polygon square; square.pb(Point(-inf,-inf));square.pb(Point(inf,-inf));square.pb(Point(inf,inf));square.pb(Point(-inf,inf));
+            Polygon square = get_big_square();
             Polygon_set ps (square);
             ps.intersection(config_space_int);
 
@@ -269,6 +274,26 @@ public:
         }
 
         return {variables, constraints};
+    }
+
+    PackingInput scalesnap_input(PackingInput& input) {
+        Polygon scaled_container;
+        {
+            auto t = get_complement(Polygon_set(scale_polygon(input.container, FT(scale))));
+            t.intersection(get_big_square());
+            auto v = to_polygon_vector(SnapToGrid(t).space);
+            assert(sz(v) == 1);
+            assert(v[0].number_of_holes() == 1);
+            scaled_container = *v[0].holes_begin();
+        }
+        PackingInput modified_input {
+            scaled_container,
+            scale_items(input.items, FT(scale))
+        };
+        foe(item, modified_input.items) {
+            item.pol = SnapToGrid(Polygon_set(item.pol)).get_single_polygon();
+        }
+        return modified_input;
     }
 
     vector<MIPConstraint> get_constraints_point_inside_convex_polygon(
@@ -375,6 +400,14 @@ public:
         return output;
     }
 
+    map<string, FT> unscale_xy_coords(map<string, FT> solution, vector<pair<MIPVariable,MIPVariable>>& xys) {
+        foe(p, xys) {
+            solution[p.fi.se] *= FT(1) / FT(scale)
+            solution[p.se.se] *= FT(1) / FT(scale)
+        }
+        return solution;
+    }
+
 };
 
 
@@ -463,10 +496,13 @@ PackingOutput OptimalPackingCallback::run(PackingInput _input) {
 PackingOutput OptimalPackingSlow::run(PackingInput _input) {
 
     cout << "[c++] Optimal slow algorithm" << endl;
-    PackingInput input {
+
+    cout << "[c++] Scaling input" << endl;
+    auto input = MIPPackingHelpers(NULL, NULL).scalesnap_input(PackingInput{
         _input.container,
-        _input.items.expand()
-    };
+        _input.items
+    });
+    input.items = input.items.expand();
 
     Gurobi_MIP problem;
     MIPPackingHelpers helper (&problem, NULL);
@@ -495,8 +531,11 @@ PackingOutput OptimalPackingSlow::run(PackingInput _input) {
     cout << "[c++] Computing solution using MIP" << endl;
     auto solution = problem.solve();
 
+    cout << "[c++] Unscaling solution coords" << endl;
+    solution = unscale_xy_coords(solution, xys);
+
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
-    PackingOutput output = helper.produce_output(_input, input.items, solution, in_use_binaries, xys);
+    PackingOutput output = helper.produce_output(_input, _input.items.expand(), solution, in_use_binaries, xys);
 
     return output;
 }
@@ -589,19 +628,3 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
 
     return output;
 }
-
-
-// Will scaling ever be useful?
-/*PackingOutput OptimalPacking::run() {
-    cout << "[c++] Scaling input" << endl;
-    PackingInput modified_input {
-        scale_polygon(input.container, scale),
-        scale_items(input.items, scale),
-    };
-    input = modified_input;
-    PackingOutput output = run_inner(true);
-    cout << "[c++] Unscaling input" << endl;
-    output.items = scale_items(output.items, 1.0/scale);
-    cout << "[c++] Result found" << endl;
-    return output;
-}*/
