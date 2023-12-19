@@ -1,3 +1,6 @@
+import sys
+print(sys.path)
+
 import time
 from py.algorithm import run_algorithm
 from py.io import read_instance

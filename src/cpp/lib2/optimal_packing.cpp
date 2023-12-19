@@ -23,9 +23,17 @@ using namespace std;
 // TODO: actually calculate bounds (inf, biginf, ...)
 
 const ll inf = 5000;
-const ll biginf = 1e7;
-const FT scale = FT(1) / FT(10000);
+const ll biginf = 1e9;
+const FT scale = FT(10000) / FT(10000);
 const ll max_partition_size = 100000;
+
+vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
+    vector<Polygon_with_holes> pols;
+    debug("gather 1");
+    pset.polygons_with_holes (back_inserter(pols));
+    debug("gather 2");
+    return pols;
+}
 
 Polygon scale_polygon(Polygon pol, FT scale) {
     foe(e, pol) {
@@ -281,18 +289,25 @@ public:
         {
             auto t = get_complement(Polygon_set(scale_polygon(input.container, FT(scale))));
             t.intersection(get_big_square());
-            auto v = to_polygon_vector(SnapToGrid(t).space);
+            debug("hey0");
+            auto v = to_polygon_vector_ref(SnapToGrid(t).space);
             assert(sz(v) == 1);
+            debug("hey1");
+            debug(v[0].number_of_holes());
             assert(v[0].number_of_holes() == 1);
             scaled_container = *v[0].holes_begin();
+            scaled_container.reverse_orientation();
+            debug("hey2");
         }
         PackingInput modified_input {
             scaled_container,
             scale_items(input.items, FT(scale))
         };
+        debug("hey3");
         foe(item, modified_input.items) {
             item.pol = SnapToGrid(Polygon_set(item.pol)).get_single_polygon();
         }
+        debug("hey4");
         return modified_input;
     }
 
@@ -402,8 +417,8 @@ public:
 
     map<string, FT> unscale_xy_coords(map<string, FT> solution, vector<pair<MIPVariable,MIPVariable>>& xys) {
         foe(p, xys) {
-            solution[p.fi.se] *= FT(1) / FT(scale)
-            solution[p.se.se] *= FT(1) / FT(scale)
+            solution[p.fi.se] *= FT(1) / FT(scale);
+            solution[p.se.se] *= FT(1) / FT(scale);
         }
         return solution;
     }
@@ -498,10 +513,7 @@ PackingOutput OptimalPackingSlow::run(PackingInput _input) {
     cout << "[c++] Optimal slow algorithm" << endl;
 
     cout << "[c++] Scaling input" << endl;
-    auto input = MIPPackingHelpers(NULL, NULL).scalesnap_input(PackingInput{
-        _input.container,
-        _input.items
-    });
+    auto input = MIPPackingHelpers(NULL, NULL).scalesnap_input(_input);
     input.items = input.items.expand();
 
     Gurobi_MIP problem;
@@ -532,10 +544,11 @@ PackingOutput OptimalPackingSlow::run(PackingInput _input) {
     auto solution = problem.solve();
 
     cout << "[c++] Unscaling solution coords" << endl;
-    solution = unscale_xy_coords(solution, xys);
+    solution = helper.unscale_xy_coords(solution, xys);
 
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
-    PackingOutput output = helper.produce_output(_input, _input.items.expand(), solution, in_use_binaries, xys);
+    auto _expanded = _input.items.expand();
+    PackingOutput output = helper.produce_output(_input, _expanded, solution, in_use_binaries, xys);
 
     return output;
 }
@@ -612,7 +625,7 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
         fon(i, sz(subset)) {
             if(!solution.count(in_use_binaries[i].se)) continue;
             if(solution[in_use_binaries[i].se] > 0.5) {
-                problem.fix_variable(in_use_binaries[i].se, 1);
+                // problem.fix_variable(in_use_binaries[i].se, 1);
             } else {
                 // problem.fix_variable(in_use_binaries[i].se, 0); // TODO: maybe delete
             }
