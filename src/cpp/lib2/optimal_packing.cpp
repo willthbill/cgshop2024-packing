@@ -23,16 +23,19 @@ using namespace std;
 // TODO: actually calculate bounds (inf, biginf, ...)
 
 const ll inf = 5000;
-const ll biginf = 1e9;
+const ll biginf = 1e8;
 const FT scale = FT(10000) / FT(10000);
 const ll max_partition_size = 100000;
 
 vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
     vector<Polygon_with_holes> pols;
-    debug("gather 1");
     pset.polygons_with_holes (back_inserter(pols));
-    debug("gather 2");
     return pols;
+}
+
+bool is_completely_inside(Polygon_set a, Polygon_set b) {
+    Polygon_set t; t.difference(b,a);
+    return t.is_empty();
 }
 
 Polygon scale_polygon(Polygon pol, FT scale) {
@@ -285,29 +288,30 @@ public:
     }
 
     PackingInput scalesnap_input(PackingInput& input) {
+        cout << "Original container area: " << input.container.area().to_double() << endl;
         Polygon scaled_container;
         {
             auto t = get_complement(Polygon_set(scale_polygon(input.container, FT(scale))));
             t.intersection(get_big_square());
-            debug("hey0");
             auto v = to_polygon_vector_ref(SnapToGrid(t).space);
             assert(sz(v) == 1);
-            debug("hey1");
-            debug(v[0].number_of_holes());
             assert(v[0].number_of_holes() == 1);
             scaled_container = *v[0].holes_begin();
             scaled_container.reverse_orientation();
-            debug("hey2");
         }
+        assert(is_completely_inside(Polygon_set(input.container), Polygon_set(scaled_container)));
+        cout << "Snapped container area: " << scaled_container.area().to_double() << endl;
         PackingInput modified_input {
             scaled_container,
             scale_items(input.items, FT(scale))
         };
-        debug("hey3");
         foe(item, modified_input.items) {
+            auto old = item.pol;
+            cout << "Original item area: " << item.pol.area().to_double() << endl;
             item.pol = SnapToGrid(Polygon_set(item.pol)).get_single_polygon();
+            cout << "Snapped item area: " << item.pol.area().to_double() << endl;
+            assert(is_completely_inside(Polygon_set(item.pol), Polygon_set(old)));
         }
-        debug("hey4");
         return modified_input;
     }
 
