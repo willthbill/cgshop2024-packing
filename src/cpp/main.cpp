@@ -49,7 +49,6 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorith
     cout << std::fixed;
     cerr << std::fixed;
 
-    cout << "hey" << endl;
     PackingInput input = input2cgal(_container, _items);
     cout << "[c++] input information: " << endl;
     cout << "      number of items: " << sz(input.items) << endl;

@@ -70,7 +70,11 @@ public:
 
     void _set_objective(std::string type, std::vector<std::pair<std::string,FT>> c) override; 
 
-    std::map<std::string,FT> solve() override; 
+    std::map<std::string,FT> solve_with_params(
+        double time_limit
+    );
+
+    std::map<std::string,FT> solve() override;
 
     void status();
 

@@ -160,7 +160,14 @@ map<string,FT> Gurobi_MIP::get_values() {
 }
 
 // TODO: we can iterate over multiple solutions
+
 map<string,FT> Gurobi_MIP::solve() {
+    return solve_with_params(30);
+}
+
+map<string,FT> Gurobi_MIP::solve_with_params(
+    double time_limit
+) {
 
     solver.update();
     status();
@@ -174,6 +181,7 @@ map<string,FT> Gurobi_MIP::solve() {
     solver.set(GRB_DoubleParam_IntFeasTol, 1e-9);
     solver.set(GRB_IntParam_LPWarmStart, 2);
     solver.set(GRB_DoubleParam_Heuristics, 0.5);
+    solver.set(GRB_DoubleParam_TimeLimit, time_limit);
     // solver.set(GRB_IntParam_LazyConstraints, 1); // TODO: only set when using lazy constraints
     solver.optimize();
 
@@ -182,7 +190,7 @@ map<string,FT> Gurobi_MIP::solve() {
 
     int optimstatus = solver.get(GRB_IntAttr_Status);
     double objval = 0;
-    if (optimstatus == GRB_OPTIMAL) {
+    if (optimstatus == GRB_OPTIMAL || optimstatus == GRB_TIME_LIMIT) {
       objval = solver.get(GRB_DoubleAttr_ObjVal); // TODO: Get int for int model
       cout << "[c++] Optimal objective: " << objval << endl;
     } else if (optimstatus == GRB_INF_OR_UNBD) {

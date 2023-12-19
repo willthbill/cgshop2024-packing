@@ -22,8 +22,8 @@ using namespace std;
 // TODO: optimize by drawing triangle around instead of square???
 // TODO: actually calculate bounds (inf, biginf, ...)
 
-const ll inf = 5000;
-const ll biginf = 1e8;
+const ll inf = 10005;
+const ll biginf = 3e8;
 const FT scale = FT(10000) / FT(10000);
 const ll max_partition_size = 100000;
 
@@ -578,24 +578,6 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
     vector<MIPVariable> in_use_binaries;
     vector<pair<MIPVariable,MIPVariable>> xys;
     map<pair<int,int>,pair<vector<MIPVariable>, vector<MIPConstraint>>> iteminitem_constraints;
-    {
-        Gurobi_MIP problem;
-        MIPPackingHelpers helper (&problem, NULL);
-        in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
-        xys = helper.get_and_add_xy_ref_variables(sz(input.items));
-        fon(i, sz(input.items)) fon(j, i) {
-            auto [variables, constraints] = helper.get_iteminitem_constraints(
-                xys[i],
-                xys[j],
-                input.items[i],
-                input.items[j],
-                "binary_exact_" + to_string(i) + "_" + to_string(j) + "_",
-                vector<MIPVariable>{in_use_binaries[i], in_use_binaries[j]}
-            );
-            iteminitem_constraints[{i,j}] = {variables, constraints};
-            iteminitem_constraints[{j,i}] = {variables, constraints};
-        }
-    }
     fon(i, sz(input.items)) {
         auto& item = input.items[i];
 
@@ -619,6 +601,18 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
 
         cout << "[c++] Adding items no overlap variables and constraints" << endl;
         fon(i, sz(subset)) fon(j, i) {
+            if(!iteminitem_constraints.count({i,j})) {
+                auto [variables, constraints] = helper.get_iteminitem_constraints(
+                    xys[i],
+                    xys[j],
+                    input.items[i],
+                    input.items[j],
+                    "binary_exact_" + to_string(i) + "_" + to_string(j) + "_",
+                    vector<MIPVariable>{in_use_binaries[i], in_use_binaries[j]}
+                );
+                iteminitem_constraints[{i,j}] = {variables, constraints};
+                iteminitem_constraints[{j,i}] = {variables, constraints};
+            }
             auto& vars = iteminitem_constraints[{i,j}].fi;
             auto& cons = iteminitem_constraints[{i,j}].se;
             foe(v, vars) helper.add_variable(v);
@@ -629,14 +623,15 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
         fon(i, sz(subset)) {
             if(!solution.count(in_use_binaries[i].se)) continue;
             if(solution[in_use_binaries[i].se] > 0.5) {
-                // problem.fix_variable(in_use_binaries[i].se, 1);
+                cout << i << endl;
+                problem.fix_variable(in_use_binaries[i].se, 1);
             } else {
                 // problem.fix_variable(in_use_binaries[i].se, 0); // TODO: maybe delete
             }
         }
 
         cout << "[c++] Computing solution using MIP" << endl;
-        solution = problem.solve();
+        solution = problem.solve_with_params(180.0 / (double)i + 1);
     }
 
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
