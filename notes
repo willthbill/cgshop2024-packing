@@ -8,4 +8,7 @@
 - why are we using the snapper right now in the iteminitem constraint? it might be floating point right?
 - skaffe adgang til itu server
 - gøre ref x og ref y til floats variables. why?
+
 - place one piece at a time and minimize y, but still keep all items
+
+- value / area of CH

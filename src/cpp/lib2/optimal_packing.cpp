@@ -22,15 +22,39 @@ using namespace std;
 // TODO: optimize by drawing triangle around instead of square???
 // TODO: actually calculate bounds (inf, biginf, ...)
 
-const ll inf = 10005;
-const ll biginf = 3e8;
-const FT scale = FT(10000) / FT(10000);
-const ll max_partition_size = 100000;
+const ll inf = 100000; // upper bound on coordinates
+const ll biginf = 3e8; // BIG M, must be greater than inf * scale * inf * scale
+const FT scale = FT(1000) / FT(10000);
+const ll max_partition_size = 100000000;
 
 vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
     vector<Polygon_with_holes> pols;
     pset.polygons_with_holes (back_inserter(pols));
     return pols;
+}
+
+vector<Polygon> fix_repeated_points(Polygon pol) {
+    vector<Point> points;
+    foe(p, pol) points.push_back(p);
+    map<Point, int> mp;
+    int idx = -1;
+    fon(i, sz(points)) {
+        auto& p = points[i];
+        if(mp.count(p)) {
+            idx = i;
+            break;
+        }
+        mp[p] = i;
+    }
+    if(idx == -1) return {pol};
+    Polygon a, b;
+    for(int i = 0; i < mp[points[idx]]; i++) a.push_back(points[i]);
+    for(int i = mp[points[idx]]; i < idx; i++) b.push_back(points[i]);
+    for(int i = idx; i < sz(points); i++) a.push_back(points[i]);
+    vector<Polygon> res;
+    foe(p, fix_repeated_points(a)) res.push_back(p);
+    foe(p, fix_repeated_points(b)) res.push_back(p);
+    return res;
 }
 
 bool is_completely_inside(Polygon_set a, Polygon_set b) {
@@ -130,8 +154,8 @@ public:
         fon(i, number_of_items) {
             auto x = get_ref_coord_variable_x(i);
             auto y = get_ref_coord_variable_y(i);
-            add_variable(x);
-            add_variable(y);
+            if(problem) add_variable(x);
+            if(problem) add_variable(y);
             xys.push_back({x,y});
         }
         return xys;
@@ -171,9 +195,15 @@ public:
                     string("is_polygon_" + to_string(i) + "_in_use")
                 )
             );
-            add_variable(in_use_binaries[i]);
+            if(problem) add_variable(in_use_binaries[i]);
         }
         return in_use_binaries;
+    }
+    ItemsContainer sort_by_value_over_area(ItemsContainer items) {
+        sort(items.begin(), items.end(), [](Item& a, Item& b) {
+            return a.value / a.pol.area() > b.value / b.pol.area();
+        });
+        return items;
     }
     pair<vector<MIPVariable>, vector<MIPConstraint>> get_iteminitem_constraints(
         pair<MIPVariable, MIPVariable>& p1,
@@ -200,6 +230,8 @@ public:
             } else {
                 // Compute configuration space
                 Polygon_set disallowed (item1.pol);
+                assert(item1.pol.is_simple());
+                assert(item2.pol.is_simple());
                 auto config_space = ConfigurationSpace(
                     disallowed,
                     item2.pol,
@@ -218,17 +250,21 @@ public:
 
             // Get the single polygon with one hole (the complement of conf space)
             auto polygons = to_polygon_vector(ps);
-            assert(sz(polygons) == 1);
-            auto polygon = polygons[0];
-            assert(polygon.number_of_holes() == 1);
-            assert_is_integer_polygon(polygon.outer_boundary());
-            foe(hole, polygon.holes()) assert_is_integer_polygon(hole);
+            foe(polygon, polygons) {
+                //assert(sz(polygons) == 1);
+                //auto polygon = polygons[0];
+                // assert(polygon.number_of_holes() == 1);
+                assert_is_integer_polygon(polygon.outer_boundary());
+                foe(hole, polygon.holes()) assert_is_integer_polygon(hole);
 
-            // Compute convex cover (triangulation, partiton or something)
-            PartitionConstructor pc (polygon);
-            partition = pc.get_constrained_delaunay_triangulation();
-            // partition = pc.get_approx_convex_partition();
-            foe(pol, partition) assert_is_integer_polygon(pol);
+                // Compute convex cover (triangulation, partiton or something)
+                PartitionConstructor pc (polygon);
+                foe(tri, pc.get_constrained_delaunay_triangulation()) {
+                    partition.push_back(tri);
+                }
+                // partition = pc.get_approx_convex_partition();
+                foe(pol, partition) assert_is_integer_polygon(pol);
+            }
         }
 
         Point ref = item1.get_reference_point();
@@ -413,6 +449,7 @@ public:
                 FT x = solution[xys[i].fi.se];
                 FT y = solution[xys[i].se.se];
                 Item new_item = items[i].move_ref_point(Point(x,y));
+                assert(is_completely_inside(Polygon_set(input.container), Polygon_set(new_item.pol)));
                 output.add_item(new_item);
             }
         }
@@ -631,12 +668,122 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
         }
 
         cout << "[c++] Computing solution using MIP" << endl;
-        solution = problem.solve_with_params(180.0 / (double)i + 1);
+        solution = problem.solve_with_params({180.0 / (double)i + 1, 0.1});
     }
 
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
     MIPPackingHelpers helper (NULL, NULL);
     PackingOutput output = helper.produce_output(_input, input.items, solution, in_use_binaries, xys);
+
+    return output;
+}
+
+PackingOutput HeuristicPackingFast::run(PackingInput _input) {
+
+    cout << "[c++] Optimal fast algorithm" << endl;
+    MIPPackingHelpers helper (NULL, NULL);
+
+    cout << "[c++] Scaling input" << endl;
+    auto input = MIPPackingHelpers(NULL, NULL).scalesnap_input(_input);
+    input.items = helper.sort_by_value_over_area(input.items.expand());
+
+    cout << "[c++] Sorting:" << endl;
+    foe(item, input.items) {
+        cout << "    " << item.value << " " << item.pol.area() << " " << (item.value / item.pol.area()).to_double() << endl;
+    }
+
+    auto original_in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
+    auto original_xys = helper.get_and_add_xy_ref_variables(sz(input.items));
+
+    map<string,FT> solution;
+    foe(p, original_in_use_binaries) solution[p.se] = 0; // just for testing
+
+    Polygon_set existing;
+    int number_of_included_items = 0;
+    fon(i, sz(input.items)) {
+        auto& item = input.items[i];
+        Gurobi_MIP problem;
+        MIPPackingHelpers helper (&problem, NULL);
+
+        // TODO: try to place in holes first in increasing order of area
+        cout << "[c++] Building tmp items from already placed items" << endl;
+        ItemsContainer items; items.add_item(item);
+        foe(pwh, to_polygon_vector(existing)) {
+            foe(pol, fix_repeated_points(pwh.outer_boundary())) {
+                items.add_item(0, 1, pol, 0);
+            }
+        }
+
+        cout << "[c++] Adding 'in-use' binaries" << endl;
+        auto in_use_binaries = helper.get_and_add_in_use_binaries(sz(items));
+
+        cout << "[c++] Adding reference x and y variables" << endl;
+        auto xys = helper.get_and_add_xy_ref_variables(sz(items));
+
+        cout << "[c++] Setting objective" << endl;
+        // helper.set_max_objective_with_in_use_binaries(items, in_use_binaries);
+        problem.set_min_objective({{xys[0].fi.se, 1}, {xys[0].se.se, inf * scale}, {in_use_binaries[0].se, -biginf}});
+
+        cout << "[c++] Adding items inside container constraints" << endl;
+        helper.add_constraints_inside_convex_polygon(
+            input.container,
+            items,
+            in_use_binaries,
+            xys
+        );
+
+        cout << "[c++] Adding items no overlap variables and constraints" << endl;
+        for(int j = 1; j < sz(items); j++) {
+            helper.add_exact_constraints(
+                xys[0], xys[j], items[0], items[j],
+                to_string(0) + "_" + to_string(j),
+                in_use_binaries[0], in_use_binaries[j]
+            );
+        }
+
+        cout << "[c++] Setting known coordinates" << endl;
+        for(int j = 1; j < sz(items); j++) {
+            auto p = items[j].get_reference_point();
+            problem.fix_variable(xys[j].fi.se, p.x());
+            problem.fix_variable(xys[j].se.se, p.y());
+            problem.fix_variable(in_use_binaries[j].se, 1);
+        }
+
+        cout << "[c++] Computing solution using MIP" << endl;
+        auto tmp = problem.solve_with_params({.time_limit = 30, .mipgap = 0});
+
+        if(tmp[in_use_binaries[0].se] > 0.5) {
+            cout << "[c++] Item was included" << endl;
+            solution[original_in_use_binaries[i].se] = 1;
+            assert(tmp.count(xys[0].fi.se));
+            assert(tmp.count(xys[0].se.se));
+            FT x = tmp[xys[0].fi.se];
+            FT y = tmp[xys[0].se.se];
+            solution[original_xys[i].fi.se] = x;
+            solution[original_xys[i].se.se] = y;
+            auto pol = item.move_ref_point(Point(x,y)).pol;
+            assert(is_completely_inside(Polygon_set(input.container), Polygon_set(pol)));
+            existing.join(pol);
+            number_of_included_items++;
+        } else {
+            cout << "[c++] Item was not included" << endl;
+            solution[original_in_use_binaries[i].se] = 0;
+        }
+        cout << "[c++] Number of included items: " << number_of_included_items << endl;
+    }
+
+    cout << "[c++] Unscaling solution coords" << endl;
+    solution = helper.unscale_xy_coords(solution, original_xys);
+
+    cout << "[c++] Moving items to found reference point solution coordinates" << endl;
+    auto _expanded = helper.sort_by_value_over_area(_input.items.expand());
+    PackingOutput output = helper.produce_output(
+        _input,
+        _expanded,
+        solution,
+        original_in_use_binaries,
+        original_xys
+    );
 
     return output;
 }

@@ -31,6 +31,11 @@ public:
 
 };
 
+struct GurobiConfig {
+    double time_limit;
+    double mipgap;
+};
+
 class Gurobi_MIP: public MIP {
 
 public:
@@ -70,9 +75,7 @@ public:
 
     void _set_objective(std::string type, std::vector<std::pair<std::string,FT>> c) override; 
 
-    std::map<std::string,FT> solve_with_params(
-        double time_limit
-    );
+    std::map<std::string,FT> solve_with_params(GurobiConfig config);
 
     std::map<std::string,FT> solve() override;
 

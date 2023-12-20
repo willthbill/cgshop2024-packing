@@ -48,3 +48,13 @@ public:
     PackingOutput run(PackingInput); 
 
 };
+
+class HeuristicPackingFast {
+
+private:
+
+public:
+
+    PackingOutput run(PackingInput); 
+
+};

@@ -50,13 +50,19 @@ ConfigurationSpace::ConfigurationSpace(Polygon_set& s, Polygon& _pol, Point ref)
     }
     int t = 0;*/
     foe(pwh, to_polygon_vector(s)) {
+
         //debug(pwh.number_of_holes());
         //foe(p, pwh.outer_boundary()) debug(p);
         //int ttt = 0;
+
         auto sum = CGAL::minkowski_sum_2(pwh, pol);
+
         /*foe(p, sum.outer_boundary()) {
             debug(p);
         }*/
+        /*debug(sum.number_of_holes());
+        foe(h, sum.holes()) debug(h.area());*/
+
         space.join(sum);
     }
     space.complement();

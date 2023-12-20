@@ -9,6 +9,8 @@
 
 using namespace std;
 
+const int MIN_INT_VAR_VALUE = -1000;
+
 bool is_gurobi_initialized = false;
 GRBEnv* gurobi_env;
 
@@ -121,7 +123,7 @@ void Gurobi_MIP::_add_variable(string name, string type) {
     } else if(type == "bin") {
         vars[name] = solver.addVar(0, 1, 0, GRB_BINARY, name);
     } else if (type == "int") {
-        vars[name] = solver.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_INTEGER, name);
+        vars[name] = solver.addVar(MIN_INT_VAR_VALUE, GRB_INFINITY, 0, GRB_INTEGER, name); // TODO: -1000 is needed in heuristic solution, but this is bad practice
     } else {
         ASSERT(false, "unknown variable type " << type);
     }
@@ -162,18 +164,18 @@ map<string,FT> Gurobi_MIP::get_values() {
 // TODO: we can iterate over multiple solutions
 
 map<string,FT> Gurobi_MIP::solve() {
-    return solve_with_params(30);
+    return solve_with_params({30, 0.1});
 }
 
 map<string,FT> Gurobi_MIP::solve_with_params(
-    double time_limit
+    GurobiConfig config
 ) {
 
     solver.update();
     status();
 
     // solver.set(GRB_DoubleParam_Cutoff, 100);
-    solver.set(GRB_DoubleParam_MIPGap, 0.1);
+    solver.set(GRB_DoubleParam_MIPGap, config.mipgap);
     solver.set(GRB_IntParam_MIPFocus, 1);
     solver.set(GRB_IntParam_NumericFocus, 3);
     solver.set(GRB_IntParam_Presolve, 2);
@@ -181,7 +183,7 @@ map<string,FT> Gurobi_MIP::solve_with_params(
     solver.set(GRB_DoubleParam_IntFeasTol, 1e-9);
     solver.set(GRB_IntParam_LPWarmStart, 2);
     solver.set(GRB_DoubleParam_Heuristics, 0.5);
-    solver.set(GRB_DoubleParam_TimeLimit, time_limit);
+    solver.set(GRB_DoubleParam_TimeLimit, config.time_limit);
     // solver.set(GRB_IntParam_LazyConstraints, 1); // TODO: only set when using lazy constraints
     solver.optimize();
 
