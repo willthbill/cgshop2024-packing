@@ -22,9 +22,10 @@ using namespace std;
 // TODO: optimize by drawing triangle around instead of square???
 // TODO: actually calculate bounds (inf, biginf, ...)
 
-const ll inf = 100000; // upper bound on coordinates
+const double scale = 1;
+const ll inf = 200 * scale; // upper bound on coordinates
 const ll biginf = 3e8; // BIG M, must be greater than inf * scale * inf * scale
-const FT scale = FT(1000) / FT(10000);
+static_assert(inf * inf, "biginf is not big enough");
 const ll max_partition_size = 100000000;
 
 vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
@@ -335,7 +336,11 @@ public:
             scaled_container = *v[0].holes_begin();
             scaled_container.reverse_orientation();
         }
-        assert(is_completely_inside(Polygon_set(input.container), Polygon_set(scaled_container)));
+        if(scale < 1) {
+            assert(is_completely_inside(Polygon_set(input.container), Polygon_set(scaled_container)));
+        } else {
+            //assert(is_completely_inside(Polygon_set(scaled_container), Polygon_set(input.container)));
+        }
         cout << "Snapped container area: " << scaled_container.area().to_double() << endl;
         PackingInput modified_input {
             scaled_container,
@@ -722,7 +727,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
         cout << "[c++] Setting objective" << endl;
         // helper.set_max_objective_with_in_use_binaries(items, in_use_binaries);
-        problem.set_min_objective({{xys[0].fi.se, 1}, {xys[0].se.se, inf * scale}, {in_use_binaries[0].se, -biginf}});
+        problem.set_min_objective({{xys[0].fi.se, 1}, {xys[0].se.se, inf}, {in_use_binaries[0].se, -biginf}});
 
         cout << "[c++] Adding items inside container constraints" << endl;
         helper.add_constraints_inside_convex_polygon(
@@ -769,7 +774,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
             cout << "[c++] Item was not included" << endl;
             solution[original_in_use_binaries[i].se] = 0;
         }
-        cout << "[c++] Number of included items: " << number_of_included_items << endl;
+        cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
     }
 
     cout << "[c++] Unscaling solution coords" << endl;
