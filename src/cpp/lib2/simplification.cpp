@@ -1,0 +1,3 @@
+class Simplication {
+public:
+;
