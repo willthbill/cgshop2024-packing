@@ -7,7 +7,7 @@ if [ "$localpath" = "" ]; then
     exit 2
 fi
 rsync -e 'ssh -p 8022 -i ~/.ssh/id_ed25519_important_only_itu_server' -ru \
-    cgshop23@preciousss.itu.dk:/mnt/large_storage/cgshop23/max-convex-cover-server/$itupath \
+    cgshop23@preciousss.itu.dk:/mnt/large_storage/cgshop23/max-polygon-packing-server/$itupath \
     $localpath
 
 # itu to here

@@ -9,3 +9,7 @@ rsync -e 'ssh -p 8022 -i ~/.ssh/id_ed25519_important_only_itu_server' -ru \
     input \
     src \
     cgshop23@preciousss.itu.dk:/mnt/large_storage/cgshop23/max-polygon-packing-server
+
+rsync -e 'ssh -p 8022 -i ~/.ssh/id_ed25519_important_only_itu_server' -ru \
+    ../cgshop-lib/CMakeLists.txt  ../cgshop-lib/lib  ../cgshop-lib/scripts \
+    cgshop23@preciousss.itu.dk:/mnt/large_storage/cgshop23/cgshop-lib

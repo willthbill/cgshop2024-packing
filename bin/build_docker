@@ -1,9 +1,9 @@
 #!/bin/bash
 
 source env.list
+#--build-arg GITHUB_AUTH="${GITHUB_AUTH}" \
 
 docker build \
-    --build-arg GITHUB_AUTH="${GITHUB_AUTH}" \
     --ulimit nofile=1024:10240 \
     -t max-polygon-packing \
     "$@" \
