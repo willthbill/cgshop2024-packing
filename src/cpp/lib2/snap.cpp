@@ -76,67 +76,69 @@ bool is_completely_inside(Polygon_with_holes a, Polygon_with_holes b) {
     return is_completely_inside(Polygon_set(a), Polygon_set(b));
 }
 Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
+    // Rounding method
     {
         bool flag = false;
         auto fix_polygon = [&flag](Polygon pol, int condition) {
-            debug(condition);
-            debug(CGAL::ON_BOUNDED_SIDE);
-            debug(CGAL::ON_UNBOUNDED_SIDE);
-            Polygon res;
-            foe(p, pol) {
-                auto t = Point(floor_exact(p.x()), floor_exact(p.y()));
-                if(pol.bounded_side(t) != condition) {
-                    res.push_back(t);
-                    continue;
-                }
-                t = Point(floor_exact(p.x()), ceil_exact(p.y()));
-                if(pol.bounded_side(t) != condition) {
-                    res.push_back(t);
-                    continue;
-                }
-                t = Point(ceil_exact(p.x()), floor_exact(p.y()));
-                if(pol.bounded_side(t) != condition) {
-                    res.push_back(t);
-                    continue;
-                }
-                t = Point(ceil_exact(p.x()), ceil_exact(p.y()));
-                if(pol.bounded_side(t) != condition) {
-                    res.push_back(t);
-                    continue;
-                }
-                debug("yo1");
-                flag = true;
-                return Polygon();
+            assert(sz(pol) >= 3);
+            auto original_orientation = pol.orientation();
+            if(original_orientation == CGAL::CLOCKWISE) {
+                pol.reverse_orientation();
             }
-            if(!res.is_simple() || res.orientation() == CGAL::CLOCKWISE) {
-                debug("yo2");
+            Polygon res;
+            vector<Point> points;
+            foe(p, pol) points.push_back(p);
+            fon(i, sz(points)) {
+                auto& pre = points[(i - 1 + sz(points)) % sz(points)];
+                auto cur = points[i];
+                auto& nxt = points[(i + 1) % sz(points)];
+                auto o = CGAL::orientation(pre, cur, nxt);
+                if(o == CGAL::COLLINEAR) continue;
+                Vector dir = 
+                    (o == CGAL::RIGHT_TURN ? -1 : 1) * (Vector(cur.x(), cur.y()) - Vector(pre.x(), pre.y())) +
+                    (o == CGAL::LEFT_TURN ? -1 : 1) * (Vector(nxt.x(), nxt.y()) - Vector(cur.x(), cur.y()));
+                assert(dir != Vector(0,0));
+                if(dir.x() > 0) cur = Point(ceil_exact(cur.x()), cur.y());
+                else cur = Point(floor_exact(cur.x()), cur.y());
+                if(dir.y() > 0) cur = Point(cur.x(), ceil_exact(cur.y()));
+                else cur = Point(cur.x(), floor_exact(cur.y()));
+                res.push_back(cur);
+            }
+            if(original_orientation == CGAL::CLOCKWISE) {
+                res.reverse_orientation();
+            }
+            if(
+                !res.is_simple() || res.orientation() == CGAL::CLOCKWISE ||
+                (condition == CGAL::ON_BOUNDED_SIDE ? !is_completely_inside(pol, res) : !is_completely_inside(res, pol))
+            ) {
                 flag = true;
-                return Polygon();
+                return res;
             }
             return res;
         };
-        auto boundary = fix_polygon(pol.outer_boundary(), CGAL::ON_BOUNDED_SIDE);
-        debug("old boundary");
-        foe(p,pol.outer_boundary()) {
-            debug(p);
-        }
-
-        debug("new boundary");
-        foe(p,boundary) {
-            debug(p);
-        }
-        assert(is_completely_inside(boundary,pol.outer_boundary()));
-        Polygon_with_holes res (boundary);
-        foe(hole, pol.holes()) {
-            if(flag) break;
-            auto new_hole = fix_polygon(hole, CGAL::ON_UNBOUNDED_SIDE);
-            assert(is_completely_inside(boundary,new_hole));
-            res.add_hole(new_hole);
+        auto boundary = fix_polygon(pol.outer_boundary(), CGAL::ON_UNBOUNDED_SIDE);
+        Polygon_with_holes res;
+        if(!flag) {
+            res = Polygon_with_holes(boundary);
+            foe(hole, pol.holes()) {
+                if(flag) break;
+                auto new_hole = fix_polygon(hole, CGAL::ON_BOUNDED_SIDE);
+                res.add_hole(new_hole);
+            }
         }
         if(!flag) {
-            cout << "[c++, snapper]: used fast snapping" << endl;
+            cout << "[c++, snapper]: used rounding-based snapping" << endl;
             assert(is_completely_inside(res,pol));
             return res;
+        } else {
+            debug("Old boundary");
+            foe(p, pol.outer_boundary()) {
+                debug(p);
+            }
+            debug("New boundary");
+            foe(p, boundary) {
+                debug(p);
+            }
         }
     }
 
@@ -289,8 +291,8 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
             if(!found) break;
         }
         int after = res.size();
-        cout << "[c++, snapper] tried " << tried << " times" << endl;
-        cout << "[c++, snapper] optimization: " << before << " -> " << after << " (diff = " << before - after << ")" << endl;
+        //cout << "[c++, snapper] tried " << tried << " times" << endl;
+        //cout << "[c++, snapper] optimization: " << before << " -> " << after << " (diff = " << before - after << ")" << endl;
         if(original_orientation == CGAL::CLOCKWISE) res.reverse_orientation();
         return res;
     };
@@ -309,11 +311,12 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
         int total_before = sz(pol.outer_boundary()), total_after = sz(reduced_res.outer_boundary());
         foe(hole, pol.holes()) total_before += sz(hole);
         foe(hole, reduced_res.holes()) total_after += sz(hole);
-        cout << "[c++, snapper] overall optimization: " << total_before << " -> " << total_after << endl;
+        //cout << "[c++, snapper] overall optimization: " << total_before << " -> " << total_after << endl;
     }
 
     //IntersectionPredicates pred (res);
     //assert(pred.is_completely_inside_slow(pol));
     assert(is_completely_inside(reduced_res,pol));
+    cout << "[c++, snapper]: used generator-based snapping" << endl;
     return reduced_res;
 }

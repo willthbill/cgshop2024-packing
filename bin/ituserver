@@ -1,0 +1,1 @@
+ssh -i ~/.ssh/id_ed25519_important_only_itu_server -p 8022 -t cgshop23@preciousss.itu.dk bash -l

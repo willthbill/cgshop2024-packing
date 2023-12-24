@@ -4,7 +4,7 @@ FROM greyltc/archlinux-aur:yay
 
 
 # Install Python 3.10, pip, CGAL, and CMake
-RUN pacman -Syu --noconfirm && pacman -S --noconfirm cgal cmake git gcc boost make scons fzf direnv which tree vim vi neovim htop tk fontconfig ttf-dejavu fd scip tmux gdb
+RUN pacman -Syu --noconfirm && pacman -S --noconfirm cgal cmake git gcc boost make scons fzf direnv which tree vim vi neovim htop tk fontconfig ttf-dejavu fd scip tmux gdb ripgrep
 
 # Install aur packages
 RUN pacman -Syu --noconfirm && aur-install gurobi

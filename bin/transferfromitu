@@ -1,0 +1,14 @@
+itupath=$1
+localpath=$2
+if [ "$itupath" = "" ]; then
+    exit 1
+fi
+if [ "$localpath" = "" ]; then
+    exit 2
+fi
+rsync -e 'ssh -p 8022 -i ~/.ssh/id_ed25519_important_only_itu_server' -ru \
+    cgshop23@preciousss.itu.dk:/mnt/large_storage/cgshop23/max-convex-cover-server/$itupath \
+    $localpath
+
+# itu to here
+# scp -r -i ~/.ssh/id_ed25519_external -P 8022 cgshop23@preciousss.itu.dk:/mnt/large_storage/cgshop23/min-convex-cover-server/output/ch_graphs/delaunay ./output/ch_graphs/delaunay

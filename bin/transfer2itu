@@ -1,0 +1,11 @@
+rsync -e 'ssh -p 8022 -i ~/.ssh/id_ed25519_important_only_itu_server' -ru \
+    CMakeLists.txt \
+    .bash_history \
+    .bashrc \
+    .envrc \
+    Dockerfile \
+    GUROBIConfig.cmake \
+    bin \
+    input \
+    src \
+    cgshop23@preciousss.itu.dk:/mnt/large_storage/cgshop23/max-polygon-packing-server

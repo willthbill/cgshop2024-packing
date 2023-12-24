@@ -23,7 +23,7 @@ using namespace std;
 // TODO: actually calculate bounds (inf, biginf, ...)
 
 const double scale = 1;
-const ll inf = 200 * scale; // upper bound on coordinates
+const ll inf = 1000 * scale; // upper bound on coordinates
 const ll biginf = 3e8; // BIG M, must be greater than inf * scale * inf * scale
 static_assert(inf * inf, "biginf is not big enough");
 const ll max_partition_size = 100000000;
