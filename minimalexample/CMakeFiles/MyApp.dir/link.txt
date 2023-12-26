@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/MyApp.dir/main.cpp.o -o MyApp  -Wl,-rpath,/home/will/projects/max-polygon-packing/minimalexample libB.so libA.so 
