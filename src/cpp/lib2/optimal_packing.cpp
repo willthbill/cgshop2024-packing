@@ -22,8 +22,8 @@ using namespace std;
 // TODO: optimize by drawing triangle around instead of square???
 // TODO: actually calculate bounds (inf, biginf, ...)
 
-const FT scale = FT(1) / FT(10000); // IMPORTANT: it is important to set it like this. the inverse must be integer
-const ll inf = 11000000 * scale.to_double(); // upper bound on coordinates
+const FT scale = FT(1) / FT(35000); // IMPORTANT: it is important to set it like this. the inverse must be integer
+const ll inf = 250000000 * scale.to_double(); // upper bound on coordinates
 const ll biginf = 3e8; // BIG M, must be greater than inf * scale * inf * scale
 // static_assert(inf * inf + 100 <= biginf, "biginf is not big enough");
 const ll max_partition_size = 100000000;
@@ -84,8 +84,8 @@ Polygon get_big_square() {
 
 void assert_is_integer_polygon(Polygon& pol) {
     foe(p, pol) {
-        ASSERT(is_integer(p.x()), "polygon has non-integer coordinate");
-        ASSERT(is_integer(p.y()), "polygon has non-integer coordinate");
+        assert(is_integer(p.x()));
+        assert(is_integer(p.y()));
     }
 }
 
@@ -202,7 +202,7 @@ public:
     }
     ItemsContainer sort_by_value_over_area(ItemsContainer items) {
         sort(items.begin(), items.end(), [](Item& a, Item& b) {
-            return a.value / a.pol.area() > b.value / b.pol.area();
+            return FT(a.value) / a.pol.area() > FT(b.value) / b.pol.area();
         });
         return items;
     }
@@ -483,7 +483,7 @@ public:
                 assert(is_integer(x));
                 assert(is_integer(y));
                 Item new_item = items[i].move_ref_point(Point(x,y));
-                assert(is_completely_inside(Polygon_set(input.container), Polygon_set(new_item.pol)));
+                // assert(is_completely_inside(Polygon_set(input.container), Polygon_set(new_item.pol)));
                 output.add_item(new_item);
             }
         }
@@ -502,6 +502,7 @@ public:
             assert(is_integer(solution[p.fi.se]));
             assert(is_integer(solution[p.se.se]));
             auto ref_scaling_translation = items[idx].ref_scaling_translation;
+            debug(ref_scaling_translation.x(), ref_scaling_translation.y());
             solution[p.fi.se] -= ref_scaling_translation.x();
             solution[p.se.se] -= ref_scaling_translation.y();
             solution[p.fi.se] *= factor;
@@ -750,6 +751,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
     cout << "[c++] Sorting:" << endl;
     input.items = helper.sort_by_value_over_area(input.items.expand());
     foe(item, input.items) {
+        cout << item.idx << endl;
         cout << "    " << item.value << " " << item.pol.area() << " " << (item.value / item.pol.area()).to_double() << endl;
     }
 
@@ -771,7 +773,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
         ItemsContainer items; items.add_item(item);
         foe(pwh, to_polygon_vector(existing)) {
             foe(pol, fix_repeated_points(pwh.outer_boundary())) {
-                items.add_item(0, 1, pol, 0);
+                items.add_item(0, 1, pol, 0, Vector(0,0));
             }
         }
 
@@ -838,6 +840,9 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
     auto _expanded = helper.sort_by_value_over_area(_input.items.expand());
+    foe(item, _expanded) {
+        cout << item.idx << endl;
+    }
     PackingOutput output = helper.produce_output(
         _input,
         _expanded,

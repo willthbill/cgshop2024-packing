@@ -12,6 +12,13 @@
 
 using namespace std;
 
+void assert_is_integer_polygon(Polygon& pol) {
+    foe(p, pol) {
+        assert(is_integer(p.x()));
+        assert(is_integer(p.y()));
+    }
+}
+
 // TODO: somehow specify the grid size
 // TODO: support polygon set
 SnapToGrid::SnapToGrid(Polygon_set pset) {
@@ -317,6 +324,8 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
     //IntersectionPredicates pred (res);
     //assert(pred.is_completely_inside_slow(pol));
     assert(is_completely_inside(reduced_res,pol));
+    assert_is_integer_polygon(reduced_res.outer_boundary());
+    foe(hole, reduced_res.holes()) assert_is_integer_polygon(hole);
     cout << "[c++, snapper]: used generator-based snapping" << endl;
     return reduced_res;
 }

@@ -26,7 +26,7 @@ public:
     ItemsContainer();
     ItemsContainer(std::vector<std::tuple<int,int,Polygon>> _items);
     void add_item(Item item); 
-    void add_item(ll v, ll q, Polygon p, int idx); 
+    void add_item(ll v, ll q, Polygon p, int idx, Vector ref_scaling_translation); 
     ItemsContainer expand(); 
     int size(); 
     Item& operator[](std::size_t i); 

@@ -19,8 +19,8 @@ typedef CGAL::Aff_transformation_2<K> Transformation;
 // TODO: duplicate implement in optimal_packing.cpp
 void assert_is_integer_polygon(Polygon& pol) {
     foe(p, pol) {
-        ASSERT(is_integer(p.x()), "polygon has non-integer coordinate");
-        ASSERT(is_integer(p.y()), "polygon has non-integer coordinate");
+        assert(is_integer(p.x()));
+        assert(is_integer(p.y()));
     }
 }
 
@@ -55,14 +55,14 @@ ItemsContainer::ItemsContainer(vector<tuple<int,int,Polygon>> _items) {
 void ItemsContainer::add_item(Item item) {
     items.push_back(item);
 }
-void ItemsContainer::add_item(ll v, ll q, Polygon p, int idx) {
-    add_item(Item{v,q,p,idx});
+void ItemsContainer::add_item(ll v, ll q, Polygon p, int idx, Vector ref_scaling_translation) {
+    add_item(Item{v,q,p,idx,ref_scaling_translation});
 }
 ItemsContainer ItemsContainer::expand() {
     ItemsContainer res;
     foe(item, items) {
         rep(item.quantity) {
-            res.add_item(item.value, 1, item.pol, item.idx);
+            res.add_item(item.value, 1, item.pol, item.idx, item.ref_scaling_translation);
         }
     }
     return res;

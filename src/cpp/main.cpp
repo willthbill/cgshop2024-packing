@@ -21,7 +21,7 @@ PackingInput input2cgal(
     int idx = 0;
     foe(item, _items) {
         auto& [v, q, ps] = item;
-        items.add_item(v, q, points2polygon(ps), idx++);
+        items.add_item(v, q, points2polygon(ps), idx++, Vector(0,0));
     }
     return {container, items};
 }
