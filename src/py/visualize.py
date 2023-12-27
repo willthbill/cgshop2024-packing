@@ -68,7 +68,8 @@ def visualize(conf, show=True, out_file=None, preserve_coords=False):
     if show: 
         print("rendering")
         plt.show()
-    if out_file is not None: plt.savefig(out_file, dpi=300)
+    if out_file is not None:
+        plt.savefig(out_file, dpi=300)
     plt.close()
 
 def visualize_instances_dir(directory, sort=None):

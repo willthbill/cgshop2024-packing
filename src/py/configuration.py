@@ -1,3 +1,5 @@
+from py import math
+
 class Configuration:
 
     def __init__(self, container, items, values):
@@ -13,6 +15,7 @@ class Configuration:
         if len(self.values) == 0: return 0
         return min(self.values)
 
+
 class InputConfiguration(Configuration):
 
     def __init__(self, container, items, values, quantities):
@@ -24,16 +27,53 @@ class InputConfiguration(Configuration):
             (self.values[i], self.quantities[i], self.items[i].get_approx_representation())
             for i in range(len(self.items))
         ]
+    
+    def get_weak_upper_bound(self):
+        res = 0
+        for i in range(len(self.values)):
+            res += self.values[i] * self.quantities[i]
+        return res
+
+    # fractional knapsack
+    def get_strong_upper_bound(self):
+        a = []
+        for idx in range(len(self.items)):
+            a.append([
+                self.values[idx] / math.area(self.items[idx]),
+                math.area(self.items[idx]) * self.quantities[idx]
+            ])
+        a.sort(reverse=True)
+        area = math.area(self.container)
+        idx = 0
+        res = 0
+        while area > 0 and idx < len(a):
+            am = min(a[idx][1], area)
+            a[idx][1] -= am
+            area -= am
+            res += a[idx][0] * am
+            if a[idx][1] <= 0:
+                idx += 1
+        return res
+
+
 
 class OutputConfiguration(Configuration):
 
     def __init__(self, indices, translations, items, input_conf):
         values = [input_conf.values[idx] for idx in indices]
         super().__init__(input_conf.container, items, values)
-        self.translations = translations
+        self.translations = []
+        for t in translations:
+            assert t[0][-2:] == "/1"
+            assert t[1][-2:] == "/1"
+            self.translations.append((
+                int(t[0][:-2]),
+                int(t[1][:-2])
+            ))
         self.indices = indices
         self.input_conf = input_conf
 
     def get_score(self):
-        return sum(self.values)
-
+        score = sum(self.values)
+        assert self.input_conf.get_weak_upper_bound() >= self.input_conf.get_strong_upper_bound() >= score
+        return score
