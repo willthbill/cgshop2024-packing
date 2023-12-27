@@ -34,6 +34,16 @@ vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
     return pols;
 }
 
+template<typename T>
+T permute(T vec, const std::vector<int>& indices) {
+    assert(sz(vec) == sz(indices));
+    T permuted = vec;
+    for(size_t i = 0; i < indices.size(); ++i) {
+        permuted[i] = vec[indices[i]];
+    }
+    return permuted;
+}
+
 vector<Polygon> fix_repeated_points(Polygon pol) {
     vector<Point> points;
     foe(p, pol) points.push_back(p);
@@ -200,11 +210,15 @@ public:
         }
         return in_use_binaries;
     }
-    ItemsContainer sort_by_value_over_area(ItemsContainer items) {
-        sort(items.begin(), items.end(), [](Item& a, Item& b) {
-            return FT(a.value) / a.pol.area() > FT(b.value) / b.pol.area();
+    vector<int> sort_by_value_over_area(ItemsContainer items) {
+        vector<int> idxs (sz(items)); iota(idxs.begin(), idxs.end(), 0);
+        sort(idxs.begin(), idxs.end(), [&](int a, int b) {
+            return FT(items[a].value) / items[a].pol.area() > FT(items[b].value) / items[b].pol.area();
         });
-        return items;
+        /*sort(items.begin(), items.end(), [](Item& a, Item& b) {
+            return FT(a.value) / a.pol.area() > FT(b.value) / b.pol.area();
+        });*/
+        return idxs;
     }
     pair<vector<MIPVariable>, vector<MIPConstraint>> get_iteminitem_constraints(
         pair<MIPVariable, MIPVariable>& p1,
@@ -750,7 +764,9 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
     cout << "[c++] Sorting:" << endl;
     // TODO: this order and the order when getting the output does not match (since the items are approximated above)!!!!!
-    input.items = helper.sort_by_value_over_area(input.items.expand());
+    input.items = input.items.expand();
+    vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items);
+    input.items = permute(input.items, sorted_idxs);
     foe(item, input.items) {
         cout << item.idx << endl;
         cout << "    " << item.value << " " << item.pol.area() << " " << (item.value / item.pol.area()).to_double() << endl;
@@ -840,7 +856,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
     solution = helper.unscale_xy_coords(solution, original_xys, input.items);
 
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
-    auto _expanded = helper.sort_by_value_over_area(_input.items.expand());
+    auto _expanded = permute(_input.items.expand(), sorted_idxs);
     foe(item, _expanded) {
         cout << item.idx << endl;
     }

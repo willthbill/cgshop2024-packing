@@ -55,7 +55,7 @@ ItemsContainer::ItemsContainer(vector<tuple<int,int,Polygon>> _items) {
 void ItemsContainer::add_item(Item item) {
     items.push_back(item);
 }
-void ItemsContainer::add_item(ll v, ll q, Polygon p, int idx, Vector ref_scaling_translation) {
+void ItemsContainer::add_item(FT v, ll q, Polygon p, int idx, Vector ref_scaling_translation) {
     add_item(Item{v,q,p,idx,ref_scaling_translation});
 }
 ItemsContainer ItemsContainer::expand() {
@@ -78,7 +78,7 @@ void PackingOutput::validate_item(Item item) {
     assert_is_integer_polygon(item.pol);
     ASSERT(item_count[item.idx] < input.items[item.idx].quantity, to_string(item_count[item.idx]) + " " + to_string(input.items[item.idx].quantity));
     ASSERT(item.quantity == 1ll, "in a result all quanities must be 1");
-    ASSERT(input.items[item.idx].value == item.value, to_string(input.items[item.idx].value) + " " + to_string(item.value));
+    assert(input.items[item.idx].value == item.value);
     ASSERT(input.items[item.idx].idx == item.idx,"");
     // ASSERT(is_polygon_inside_polygon(item.pol, input.container), "translated item " << item.idx << " is not inside container");
     get_translation(item);
@@ -165,8 +165,8 @@ void PackingOutput::validate_result() {
     }
 }
 
-ll PackingOutput::get_score() {
-    ll sum = 0ll;
+FT PackingOutput::get_score() {
+    FT sum = 0;
     foe(item, items) {
         sum += item.value;
     }

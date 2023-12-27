@@ -7,7 +7,7 @@
 
 struct Item {
 
-    ll value;
+    FT value;
     ll quantity;
     Polygon pol;
     int idx;
@@ -26,7 +26,7 @@ public:
     ItemsContainer();
     ItemsContainer(std::vector<std::tuple<int,int,Polygon>> _items);
     void add_item(Item item); 
-    void add_item(ll v, ll q, Polygon p, int idx, Vector ref_scaling_translation); 
+    void add_item(FT v, ll q, Polygon p, int idx, Vector ref_scaling_translation); 
     ItemsContainer expand(); 
     int size(); 
     Item& operator[](std::size_t i); 
@@ -69,7 +69,7 @@ public:
 
     void validate_result(); 
 
-    ll get_score(); 
+    FT get_score(); 
 
     int size(); 
 
