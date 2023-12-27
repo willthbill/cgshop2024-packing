@@ -13,6 +13,7 @@ def find_solution_json_files(directory):
 
 
 solution_files = find_solution_json_files("output")
+print(len(solution_files), "solutions found\n")
 
 names = {}
 for file in solution_files:
@@ -21,11 +22,11 @@ for file in solution_files:
     name = metadata["name"]
     if name not in names:
         names[name] = []
-    names[name].append((metadata["score"], metadata))
+    names[name].append((metadata))
 
 best_filenames = []
 for name in names:
-    names[name].sort(key=lambda x: x[0], reverse=True)
+    names[name].sort(key=lambda x: x["score"], reverse=True)
     scores = [d["score"] for d in names[name]]
     best = names[name][0]
     weak = best["weak_upper_bound"]
@@ -33,7 +34,10 @@ for name in names:
     strong = best["strong_upper_bound"]
     assert all(d["strong_upper_bound"] == strong for d in names[name])
     assert all(s <= strong <= weak for s in scores)
-    print(f"{name}: {weak} >= {strong} >= {scores} [best: {best['output_dir']}]")
+    print(f"{name}")
+    print(f"   {weak} >= {strong} >= {scores}")
+    print(f"   relative to strong: {scores[0] / strong}")
+    print(f"   best: {best['output_dir']}")
     best_filenames.append(best["output_filename"])
 
 submission_filename = "submission.zip"

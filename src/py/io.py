@@ -50,7 +50,7 @@ def read_instance(filename, sort=None, expand=False):
 def read_output_metadata(filename):
     with open(filename, 'r') as f:
         data = json.load(f)
-    metadata = data["metadata"]
+    metadata = data["meta"]
     return metadata
 
 
@@ -104,7 +104,7 @@ def write_output(dir, name, input_filename, run_id, output_conf):
     # Ensure the directory exists
     assert os.path.exists(dir)
 
-    output_filename = os.path.join(dir, 'output.json')
+    output_filename = os.path.join(dir, 'solution.json')
     metadata = {
         'name': name,
         'input_filename': input_filename,

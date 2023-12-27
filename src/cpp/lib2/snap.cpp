@@ -131,14 +131,14 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
             assert(is_completely_inside(res,pol));
             return res;
         } else {
-            debug("Old boundary");
+            /*debug("Old boundary");
             foe(p, pol.outer_boundary()) {
                 debug(p);
             }
             debug("New boundary");
             foe(p, boundary) {
                 debug(p);
-            }
+            }*/
         }
     }
 

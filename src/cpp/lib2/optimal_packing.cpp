@@ -22,10 +22,10 @@ using namespace std;
 // TODO: optimize by drawing triangle around instead of square???
 // TODO: actually calculate bounds (inf, biginf, ...)
 
-const double scale = 1;
-const ll inf = 1000 * scale; // upper bound on coordinates
+const FT scale = FT(1) / FT(10000); // IMPORTANT: it is important to set it like this. the inverse must be integer
+const ll inf = 11000000 * scale.to_double(); // upper bound on coordinates
 const ll biginf = 3e8; // BIG M, must be greater than inf * scale * inf * scale
-static_assert(inf * inf, "biginf is not big enough");
+// static_assert(inf * inf + 100 <= biginf, "biginf is not big enough");
 const ll max_partition_size = 100000000;
 
 vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
@@ -337,21 +337,48 @@ public:
             scaled_container.reverse_orientation();
         }
         if(scale < 1) {
-            assert(is_completely_inside(Polygon_set(input.container), Polygon_set(scaled_container)));
+            // assert(is_completely_inside(Polygon_set(input.container), Polygon_set(scaled_container)));
         } else {
             //assert(is_completely_inside(Polygon_set(scaled_container), Polygon_set(input.container)));
         }
         cout << "Snapped container area: " << scaled_container.area().to_double() << endl;
+        foe(p, scaled_container) {
+            assert(is_integer(p.x()));
+            assert(is_integer(p.y()));
+            //assert(p.x() >= 0);
+            //assert(p.y() >= 0);
+        }
         PackingInput modified_input {
             scaled_container,
             scale_items(input.items, FT(scale))
         };
         foe(item, modified_input.items) {
+            debug("NEW ITEM");
             auto old = item.pol;
+            auto old_ref = item.get_reference_point();
+            debug(scale);
+            debug(old_ref);
+            foe(p, old) {
+                assert(p.x() >= 0);
+                assert(p.y() >= 0);
+            }
             cout << "Original item area: " << item.pol.area().to_double() << endl;
             item.pol = SnapToGrid(Polygon_set(item.pol)).get_single_polygon();
             cout << "Snapped item area: " << item.pol.area().to_double() << endl;
             assert(is_completely_inside(Polygon_set(item.pol), Polygon_set(old)));
+            Vector ref_translation = item.get_reference_point() - old_ref;
+            debug(ref_translation.x(), ref_translation.y());
+            assert(is_integer(item.get_reference_point().x()));
+            assert(is_integer(item.get_reference_point().y()));
+            item.ref_scaling_translation = ref_translation;
+            debug(item.get_reference_point());
+            foe(p, item.pol) {
+                assert(is_integer(p.x()));
+                assert(is_integer(p.y()));
+                //assert(p.x() >= 0);
+                //assert(p.y() >= 0);
+            }
+            debug("END ITEM");
         }
         return modified_input;
     }
@@ -453,6 +480,8 @@ public:
             if(solution[in_use_binaries[i].se] > 0.5) {
                 FT x = solution[xys[i].fi.se];
                 FT y = solution[xys[i].se.se];
+                assert(is_integer(x));
+                assert(is_integer(y));
                 Item new_item = items[i].move_ref_point(Point(x,y));
                 assert(is_completely_inside(Polygon_set(input.container), Polygon_set(new_item.pol)));
                 output.add_item(new_item);
@@ -461,10 +490,25 @@ public:
         return output;
     }
 
-    map<string, FT> unscale_xy_coords(map<string, FT> solution, vector<pair<MIPVariable,MIPVariable>>& xys) {
+    map<string, FT> unscale_xy_coords(
+        map<string, FT> solution,
+        vector<pair<MIPVariable,MIPVariable>>& xys,
+        ItemsContainer& items
+    ) {
+        FT factor = FT(1) / scale;
+        assert(is_integer(factor));
+        int idx = 0;
         foe(p, xys) {
-            solution[p.fi.se] *= FT(1) / FT(scale);
-            solution[p.se.se] *= FT(1) / FT(scale);
+            assert(is_integer(solution[p.fi.se]));
+            assert(is_integer(solution[p.se.se]));
+            auto ref_scaling_translation = items[idx].ref_scaling_translation;
+            solution[p.fi.se] -= ref_scaling_translation.x();
+            solution[p.se.se] -= ref_scaling_translation.y();
+            solution[p.fi.se] *= factor;
+            solution[p.se.se] *= factor;
+            assert(is_integer(solution[p.fi.se]));
+            assert(is_integer(solution[p.se.se]));
+            idx++;
         }
         return solution;
     }
@@ -560,6 +604,7 @@ PackingOutput OptimalPackingSlow::run(PackingInput _input) {
 
     cout << "[c++] Scaling input" << endl;
     auto input = MIPPackingHelpers(NULL, NULL).scalesnap_input(_input);
+    assert(false); // USE REF TRANSLATIONS
     input.items = input.items.expand();
 
     Gurobi_MIP problem;
@@ -590,7 +635,7 @@ PackingOutput OptimalPackingSlow::run(PackingInput _input) {
     auto solution = problem.solve();
 
     cout << "[c++] Unscaling solution coords" << endl;
-    solution = helper.unscale_xy_coords(solution, xys);
+    solution = helper.unscale_xy_coords(solution, xys, input.items);
 
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
     auto _expanded = _input.items.expand();
@@ -685,14 +730,25 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
 
 PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
+    assert(inf * inf + 10000 < biginf);
+
+    /*foe(p, _input.container) {
+        p = {p.x() + 100, p.y() + 100};
+    }
+    foe(item, _input.items) {
+        foe(p, item.pol) {
+            p = {p.x() + 100, p.y() + 100};
+        }
+    }*/
+
     cout << "[c++] Optimal fast algorithm" << endl;
     MIPPackingHelpers helper (NULL, NULL);
 
     cout << "[c++] Scaling input" << endl;
     auto input = MIPPackingHelpers(NULL, NULL).scalesnap_input(_input);
-    input.items = helper.sort_by_value_over_area(input.items.expand());
 
     cout << "[c++] Sorting:" << endl;
+    input.items = helper.sort_by_value_over_area(input.items.expand());
     foe(item, input.items) {
         cout << "    " << item.value << " " << item.pol.area() << " " << (item.value / item.pol.area()).to_double() << endl;
     }
@@ -778,7 +834,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
     }
 
     cout << "[c++] Unscaling solution coords" << endl;
-    solution = helper.unscale_xy_coords(solution, original_xys);
+    solution = helper.unscale_xy_coords(solution, original_xys, input.items);
 
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
     auto _expanded = helper.sort_by_value_over_area(_input.items.expand());

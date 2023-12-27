@@ -1,5 +1,6 @@
 from py import math
 
+
 class Configuration:
 
     def __init__(self, container, items, values):
@@ -14,6 +15,23 @@ class Configuration:
     def get_min_value(self):
         if len(self.values) == 0: return 0
         return min(self.values)
+    
+    def get_max_x(self):
+        mx = 0
+        for item in self.items + [self.container]:
+            for point in item.points:
+                mx = max(mx, point[0])
+        return mx
+
+    def get_max_y(self):
+        mx = 0
+        for item in self.items + [self.container]:
+            for point in item.points:
+                mx = max(mx, point[1])
+        return mx
+
+    def get_max_xy(self):
+        return max(self.get_max_x(), self.get_max_y())
 
 
 class InputConfiguration(Configuration):
@@ -21,6 +39,9 @@ class InputConfiguration(Configuration):
     def __init__(self, container, items, values, quantities):
         super().__init__(container, items, values)
         self.quantities = quantities
+
+    def get_number_of_items(self):
+        return sum(self.quantities)
 
     def get_cpp_items(self):
         return [

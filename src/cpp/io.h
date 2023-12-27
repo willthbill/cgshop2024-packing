@@ -11,6 +11,7 @@ struct Item {
     ll quantity;
     Polygon pol;
     int idx;
+    Vector ref_scaling_translation; // how do undo scaling
 
     Item move_ref_point(Point p);
 

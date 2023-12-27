@@ -32,6 +32,7 @@ RUN chown -R myuser:mygroup /app
 USER myuser
 RUN python -m venv venv
 ENV PATH="venv/bin:$PATH"
+RUN pip install -U -v cgshop2024-pyutils
 RUN pip install --no-cache-dir matplotlib numpy pybind11
 
 COPY .bashrc /home/myuser/
