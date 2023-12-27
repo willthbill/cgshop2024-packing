@@ -22,11 +22,6 @@ using namespace std;
 // TODO: optimize by drawing triangle around instead of square???
 // TODO: actually calculate bounds (inf, biginf, ...)
 
-const FT scale = FT(1) / FT(35000); // IMPORTANT: it is important to set it like this. the inverse must be integer
-const ll inf = 250000000 * scale.to_double(); // upper bound on coordinates
-const ll biginf = 3e8; // BIG M, must be greater than inf * scale * inf * scale
-// static_assert(inf * inf + 100 <= biginf, "biginf is not big enough");
-const ll max_partition_size = 100000000;
 
 vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
     vector<Polygon_with_holes> pols;
@@ -134,6 +129,10 @@ FT find_min_distance(const Polygon& poly1, const Polygon& poly2) {
 
 
 class MIPPackingHelpers {
+    static FT scale = FT(1) / FT(35000); // IMPORTANT: it is important to set it like this. the inverse must be integer
+    static FT inf = 250000000 * scale.to_double(); // upper bound on coordinates
+    static FT biginf = 3e8; // BIG M, must be greater than inf * scale * inf * scale
+    static FT max_partition_size = 100000000;
 private:
     Gurobi_MIP* problem;
     GurobiCallback* callbackobj;
@@ -367,11 +366,8 @@ public:
             scale_items(input.items, FT(scale))
         };
         foe(item, modified_input.items) {
-            debug("NEW ITEM");
             auto old = item.pol;
             auto old_ref = item.get_reference_point();
-            debug(scale);
-            debug(old_ref);
             foe(p, old) {
                 assert(p.x() >= 0);
                 assert(p.y() >= 0);
@@ -381,18 +377,13 @@ public:
             cout << "Snapped item area: " << item.pol.area().to_double() << endl;
             assert(is_completely_inside(Polygon_set(item.pol), Polygon_set(old)));
             Vector ref_translation = item.get_reference_point() - old_ref;
-            debug(ref_translation.x(), ref_translation.y());
             assert(is_integer(item.get_reference_point().x()));
             assert(is_integer(item.get_reference_point().y()));
             item.ref_scaling_translation = ref_translation;
-            debug(item.get_reference_point());
             foe(p, item.pol) {
                 assert(is_integer(p.x()));
                 assert(is_integer(p.y()));
-                //assert(p.x() >= 0);
-                //assert(p.y() >= 0);
             }
-            debug("END ITEM");
         }
         return modified_input;
     }
@@ -516,7 +507,6 @@ public:
             assert(is_integer(solution[p.fi.se]));
             assert(is_integer(solution[p.se.se]));
             auto ref_scaling_translation = items[idx].ref_scaling_translation;
-            debug(ref_scaling_translation.x(), ref_scaling_translation.y());
             solution[p.fi.se] -= ref_scaling_translation.x();
             solution[p.se.se] -= ref_scaling_translation.y();
             solution[p.fi.se] *= factor;
@@ -527,6 +517,8 @@ public:
         }
         return solution;
     }
+
+    bool set_
 
 };
 
@@ -768,8 +760,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
     vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items);
     input.items = permute(input.items, sorted_idxs);
     foe(item, input.items) {
-        cout << item.idx << endl;
-        cout << "    " << item.value << " " << item.pol.area() << " " << (item.value / item.pol.area()).to_double() << endl;
+        cout << "    " << item.value.to_double() << " " << item.pol.area().to_double() << " " << (item.value / item.pol.area()).to_double() << endl;
     }
 
     auto original_in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
@@ -857,8 +848,10 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
     auto _expanded = permute(_input.items.expand(), sorted_idxs);
-    foe(item, _expanded) {
-        cout << item.idx << endl;
+    {
+        fon(i, sz(_expanded))  {
+            assert(_expanded[i].idx == input.items[i].idx);
+        }
     }
     PackingOutput output = helper.produce_output(
         _input,

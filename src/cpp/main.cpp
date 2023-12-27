@@ -3,6 +3,7 @@
 #include <pybind11/stl.h>
 
 #include "io.h"
+#include "lib2/util.h"
 #include "lib/util/com.h"
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
@@ -61,7 +62,8 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorith
         val.validate_result();
         auto score = val.get_score();
         ASSERT(score == res.get_score(),"scores do not match");
-        cout << "[c++] Score: " << score << endl;
+        assert(is_integer(score));
+        cout << "[c++] Score: " << score << " ~= " << score.to_double() << endl;
         cout << "[c++] Number of items in solutions: " << sz(val) << endl;
     }
     return cgal2output(res);

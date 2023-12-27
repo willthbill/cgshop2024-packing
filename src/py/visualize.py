@@ -81,4 +81,3 @@ def visualize_instance_file(filename, sort=None):
     name, filename, conf = io.read_instance(filename, sort, expand=True)
     print(name, filename)
     visualize(conf, show=True)
-
