@@ -749,6 +749,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
     auto input = MIPPackingHelpers(NULL, NULL).scalesnap_input(_input);
 
     cout << "[c++] Sorting:" << endl;
+    // TODO: this order and the order when getting the output does not match (since the items are approximated above)!!!!!
     input.items = helper.sort_by_value_over_area(input.items.expand());
     foe(item, input.items) {
         cout << item.idx << endl;
