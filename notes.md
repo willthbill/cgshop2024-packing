@@ -32,3 +32,6 @@
 - allow some pieces to move around and others to be part of the big piece. for example most recent pieces can move
 
 - is it possible to have two types of inf. One related to item coordinates and one for container?
+- there are some unnecessary variables/constraints:
+    - in iteminitem and inside container constraints we don't need to condition it on in_use_binaries, since we have the extra constraint that the sum of the helper binaries should be at least one.??
+    - in inside pset basically the same thing???

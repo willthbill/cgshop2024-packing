@@ -157,7 +157,7 @@ public:
         max_partition_size = 100'000'000;
         assert(max_partition_size > 0);
 
-        biginf = 500'000'000; // BIG M, must be greater than inf * scale * inf * scale
+        biginf = 10'000'000; // BIG M, must be greater than inf * scale * inf * scale
         assert(biginf > 0);
 
         // mx * mx * 1.1 * 1.1 * 1.3 * 1.3 + 10000 < biginf
@@ -391,7 +391,7 @@ public:
         {
             vector<pair<string,FT>> terms;
             foe(b, variables) terms.push_back({b.se,1});
-            foe(v, enabled) terms.push_back(make_pair(v.se, -(max_partition_size + 100ll)));
+            foe(v, enabled) terms.push_back(make_pair(v.se, -(max_partition_size + 100ll))); // TODO: do we need this? not really right?
             assert(sz(terms) < max_partition_size - 1000);
             constraints.push_back({
                 terms,
@@ -458,7 +458,7 @@ public:
         Polygon& pol,
         MIPVariable& var_x,
         MIPVariable& var_y,
-        MIPVariable& binary, // whether the constraints should be enabled
+        vector<MIPVariable>& binaries, // whether the constraints should be enabled
         Vector offset // the point (var_x, var_y) + offset
     ) {
         ASSERT(pol.orientation() == CGAL::COUNTERCLOCKWISE, "must have counterclockwise orientation");
@@ -468,19 +468,93 @@ public:
             Point c2 = pol[(k+1) % sz(pol)];
             auto o = offset;
             Vector v1 (c2.x() - c1.x(), c2.y() - c1.y());
+            vector<pair<string, FT>> lhs = {{var_y.se,v1.x()},{var_x.se,-v1.y()}};
+            foe(bin, binaries) {
+                lhs.push_back({bin.se,-biginf});
+            }
             res.push_back({
-                {{var_y.se,v1.x()},{var_x.se,-v1.y()}, {binary.se,-biginf}},
+                lhs,
                 "geq",
-                -v1.x() * o.y() + v1.x() * c1.y() + v1.y() * o.x() - v1.y() * c1.x() - biginf // TODO: safe in terms of casting??
+                -v1.x() * o.y() + v1.x() * c1.y() + v1.y() * o.x() - v1.y() * c1.x() - FT(sz(binaries)) * biginf // TODO: safe in terms of casting??
             });
         }
         return res;
     }
+    void add_constraints_inside_polygon_set(
+        Polygon_set& pset,
+        ItemsContainer& items,
+        vector<MIPVariable>& in_use_binaries,
+        vector<pair<MIPVariable,MIPVariable>>& xy_ref_variables
+    ) {
+        assert(false); // TODO: the problem is that this says that the entire polygon should be inside one of the convex regions. but it should just say that the reference point is inside one region.
+        auto cover = ConvexCover::get_convex_cover(pset);
+        {
+            FT area_pset = 0;
+            FT area_cover = 0;
+            foe(p, to_polygon_vector(pset)) {
+                // area_pset += p.outer_boundary().area();
+                assert(p.outer_boundary().is_simple());
+                foe(pol, fix_repeated_points(p.outer_boundary())) {
+                    area_pset += pol.area();
+                }
+                foe(h, p.holes()) {
+                    assert(h.is_simple());
+                    foe(pol, fix_repeated_points(h)) {
+                        area_pset -= -pol.area();
+                    }
+                    // area_pset -= -h.area();
+                }
+            }
+            foe(pol, cover) {
+                assert(pol.area() > 0);
+                area_cover += pol.area();
+                assert(pol.is_simple());
+                assert(pol.orientation() == CGAL::COUNTERCLOCKWISE);
+                debug(pol.area());
+            }
+            debug(area_pset, area_cover);
+            Polygon_set un;
+            foe(pol, cover) un.join(pol);
+            assert(is_completely_inside(un, pset));
+            assert(is_completely_inside(pset, un));
+            assert(area_pset <= area_cover);
 
+            /*foe(pwh, to_polygon_vector(existing)) {
+                foe(pol, fix_repeated_points(pwh.outer_boundary())) {
+                    items.add_item(0, 1, pol, 0, Vector(0,0));
+                }
+            }*/
+        }
+        vector<vector<MIPVariable>> all_tmp_binaries (sz(items));
+        fon(idx, sz(cover)) {
+            assert_is_integer_polygon(cover[idx]);
+            vector<vector<MIPVariable>> binaries;
+            foe(b, in_use_binaries) binaries.push_back({b});
+            fon(i, sz(items)) {
+                MIPVariable var = {"int", "polygon_set_binary_" + to_string(i) + "_" + to_string(idx)}; // TODO: must be unique
+                add_variable(var);
+                binaries[i].push_back(var);
+                all_tmp_binaries[i].push_back(var);
+            }
+            add_constraints_inside_convex_polygon(cover[idx], items, binaries, xy_ref_variables);
+        }
+        // At least one convex region used for every item
+        fon(i, sz(items)) {
+            vector<pair<string,FT>> terms;
+            foe(b, all_tmp_binaries[i]) terms.push_back({b.se,1});
+            terms.push_back(make_pair(in_use_binaries[i].se, -(max_partition_size + 100ll))); // TODO: do we need this? not really right?
+            assert(sz(terms) < max_partition_size - 1000);
+            add_constraint({
+                terms,
+                "geq",
+                1ll - (max_partition_size + 100ll)
+            });
+        }
+    }
     void add_constraints_inside_convex_polygon(
         Polygon& pol,
         ItemsContainer& items,
-        vector<MIPVariable>& in_use_binaries,
+        vector<vector<MIPVariable>>& binaries,
         vector<pair<MIPVariable,MIPVariable>>& xy_ref_variables
     ) {
         fon(i, sz(items)) {
@@ -489,12 +563,22 @@ public:
             auto ref = items[i].get_reference_point();
             foe(p, items[i].pol) {
                 foe(constraint, get_constraints_point_inside_convex_polygon(
-                    pol, x, y, in_use_binaries[i], p - ref
+                    pol, x, y, binaries[i], p - ref
                 )) {
                     add_constraint(constraint);
                 }
             }
         }
+    }
+    void add_constraints_inside_convex_polygon(
+        Polygon& pol,
+        ItemsContainer& items,
+        vector<MIPVariable>& in_use_binaries,
+        vector<pair<MIPVariable,MIPVariable>>& xy_ref_variables
+    ) {
+        vector<vector<MIPVariable>> binaries;
+        foe(b, in_use_binaries) binaries.push_back({b});
+        add_constraints_inside_convex_polygon(pol, items, binaries, xy_ref_variables);
     }
     void add_bbox_constraints(
         pair<MIPVariable,MIPVariable>& xy_1,
@@ -835,11 +919,11 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
         // TODO: try to place in holes first in increasing order of area
         cout << "[c++] Building tmp items from already placed items" << endl;
         ItemsContainer items; items.add_item(item);
-        foe(pwh, to_polygon_vector(existing)) {
+        /*foe(pwh, to_polygon_vector(existing)) {
             foe(pol, fix_repeated_points(pwh.outer_boundary())) {
                 items.add_item(0, 1, pol, 0, Vector(0,0));
             }
-        }
+        }*/
 
         cout << "[c++] Adding 'in-use' binaries" << endl;
         auto in_use_binaries = helper.get_and_add_in_use_binaries(sz(items));
@@ -851,30 +935,49 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
         // helper.set_max_objective_with_in_use_binaries(items, in_use_binaries);
         problem.set_min_objective({{xys[0].fi.se, 1}, {xys[0].se.se, MIPPackingHelpers::inf}, {in_use_binaries[0].se, -MIPPackingHelpers::biginf}});
 
+        cout << "[c++] Compute allowed space" << endl;
+        //Polygon_set allowed_space;
+        //allowed_space.intersection(Polygon_set(input.container), get_complement(existing)); // TODO: dont compute this every time if not changed
+
         cout << "[c++] Adding items inside container constraints" << endl;
-        helper.add_constraints_inside_convex_polygon(
-            input.container,
+        //auto t = Polygon_set(to_polygon_vector(allowed_space)[0].outer_boundary());
+        Polygon_set finalone;
+        foe(pwh, to_polygon_vector(existing)) {
+            foe(pol, fix_repeated_points(pwh.outer_boundary())) {
+                finalone.join(pol);
+            }
+        }
+        Polygon_set allowed_space;
+        allowed_space.intersection(Polygon_set(input.container), get_complement(finalone)); // TODO: dont compute this every time if not changed
+        helper.add_constraints_inside_polygon_set(
+            allowed_space,
             items,
             in_use_binaries,
             xys
         );
+        /*helper.add_constraints_inside_convex_polygon(
+            input.container,
+            items,
+            in_use_binaries,
+            xys
+        );*/
 
-        cout << "[c++] Adding items no overlap variables and constraints" << endl;
-        for(int j = 1; j < sz(items); j++) {
+        //cout << "[c++] Adding items no overlap variables and constraints" << endl;
+        /*for(int j = 1; j < sz(items); j++) {
             helper.add_exact_constraints(
                 xys[0], xys[j], items[0], items[j],
                 to_string(0) + "_" + to_string(j),
                 in_use_binaries[0], in_use_binaries[j]
             );
-        }
+        }*/
 
-        cout << "[c++] Setting known coordinates" << endl;
+        /*cout << "[c++] Setting known coordinates" << endl;
         for(int j = 1; j < sz(items); j++) {
             auto p = items[j].get_reference_point();
             problem.fix_variable(xys[j].fi.se, p.x());
             problem.fix_variable(xys[j].se.se, p.y());
             problem.fix_variable(in_use_binaries[j].se, 1);
-        }
+        }*/
 
         cout << "[c++] Computing solution using MIP" << endl;
         auto tmp = problem.solve_with_params({.time_limit = 30, .mipgap = 0});
@@ -890,6 +993,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
             solution[original_xys[i].se.se] = y;
             auto pol = item.move_ref_point(Point(x,y)).pol;
             assert(is_completely_inside(Polygon_set(input.container), Polygon_set(pol)));
+            assert(is_completely_inside(get_complement(existing), Polygon_set(pol)));
             existing.join(pol);
             number_of_included_items++;
         } else {
