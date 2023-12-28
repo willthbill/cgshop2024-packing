@@ -82,10 +82,6 @@ ItemsContainer scale_items(ItemsContainer items, FT scale) {
     return items;
 }
 
-Polygon get_big_square() {
-    Polygon square; square.pb(Point(-inf,-inf));square.pb(Point(inf,-inf));square.pb(Point(inf,inf));square.pb(Point(-inf,inf));
-    return square;
-}
 
 void assert_is_integer_polygon(Polygon& pol) {
     foe(p, pol) {
@@ -95,7 +91,7 @@ void assert_is_integer_polygon(Polygon& pol) {
 }
 
 Polygon get_bounding_box(Polygon& pol) {
-    FT mnx = biginf, mxx = -biginf, mny = biginf, mxy = -biginf;
+    FT mnx = 1e18, mxx = -1e18, mny = 1e18, mxy = -1e18;
     foe(p, pol) mnx = min(mnx, p.x());
     foe(p, pol) mxx = max(mxx, p.x());
     foe(p, pol) mny = min(mny, p.y());
@@ -129,17 +125,82 @@ FT find_min_distance(const Polygon& poly1, const Polygon& poly2) {
 
 
 class MIPPackingHelpers {
-    static FT scale = FT(1) / FT(35000); // IMPORTANT: it is important to set it like this. the inverse must be integer
-    static FT inf = 250000000 * scale.to_double(); // upper bound on coordinates
-    static FT biginf = 3e8; // BIG M, must be greater than inf * scale * inf * scale
-    static FT max_partition_size = 100000000;
 private:
     Gurobi_MIP* problem;
     GurobiCallback* callbackobj;
 public:
+
+    static FT scale; // = FT(1) / FT(15000); // IMPORTANT: it is important to set it like 1/int. the inverse must be integer
+    static FT inf; // = 250000000 * scale.to_double(); // upper bound on coordinates
+    static FT biginf; // = 3e8; // BIG M, must be greater than inf * scale * inf * scale
+    static FT max_partition_size; // = 100000000;
+
     MIPPackingHelpers(Gurobi_MIP* _problem, GurobiCallback* _callbackobj) {
         problem = _problem;
         callbackobj = _callbackobj;
+    }
+    void set_global_packing_parameter(PackingInput& input) {
+        FT mx = -1e9;
+        foe(item, input.items) {
+            foe(p, item.pol) {
+                mx = max(mx, p.x() < 0 ? -p.x() : p.x());
+                mx = max(mx, p.y() < 0 ? -p.y() : p.y());
+            }
+        }
+        foe(p, input.container) {
+            mx = max(mx, p.x() < 0 ? -p.x() : p.x());
+            mx = max(mx, p.y() < 0 ? -p.y() : p.y());
+        }
+        cout << "[c++] Parameters:" << endl;
+        cout << " - maximum coordinate value: " << mx << endl;
+
+        max_partition_size = 100'000'000;
+        assert(max_partition_size > 0);
+
+        biginf = 500'000'000; // BIG M, must be greater than inf * scale * inf * scale
+        assert(biginf > 0);
+
+        // mx * mx * 1.1 * 1.1 * 1.3 * 1.3 + 10000 < biginf
+        // -->
+        // mx * mx < (biginf - 10000) / (1.1 * 1.1 * 1.3 * 1.3)
+        // -->
+        // mx < sqrt((biginf - 10000) / (1.1 * 1.1 * 1.3 * 1.3))
+        // -->
+        // mx * scale < sqrt((biginf - 10000) / (1.1 * 1.1 * 1.3 * 1.3))
+        // -->
+        // scale < sqrt((biginf - 10000) / (1.1 * 1.1 * 1.3 * 1.3)) / mx
+
+        scale = ceil_exact(mx / (FT(sqrt(biginf.to_double()))) / 0.4 / 0.935);
+        assert(scale >= -0.00001);
+        if(scale <= 1) scale = 1;
+        scale = FT(1)/FT(scale);
+
+        assert(scale > 0.00000001);
+        assert(scale <= 1);
+        if(mx * mx < biginf * 0.1) assert(scale == 1);
+
+        mx = ceil((mx * scale.to_double()).to_double());
+        inf = ceil((100 + mx * 2.5).to_double()); // upper bound on coordinates
+        assert(inf > 0);
+        assert(mx > 0);
+        assert(mx * 2.5 < inf);
+        assert(inf * inf * 1.1 + 10000 < biginf);
+
+        assert(is_integer(inf));
+        assert(is_integer(mx));
+        assert(is_integer(biginf));
+        assert(is_integer(max_partition_size));
+
+        cout << " - max_partition_size: " << max_partition_size << " ~=" << max_partition_size.to_double() << endl;
+        cout << " - biginf: " << biginf << " ~= " << biginf.to_double() << endl;
+        cout << " - inf: " << inf << " ~= " << inf.to_double() << endl;
+        cout << " - scale: " << scale << " ~= " << scale.to_double() << endl;
+        cout << " - mx / inf = " << (mx / inf).to_double() << ", mx * mx / biginf = " << (mx * mx / biginf).to_double() << ", inf * inf / biginf = " << (inf * inf / biginf).to_double() << endl;
+        cout << endl;
+    }
+    Polygon get_big_square() {
+        Polygon square; square.pb(Point(-inf,-inf));square.pb(Point(inf,-inf));square.pb(Point(inf,inf));square.pb(Point(-inf,inf));
+        return square;
     }
     MIPVariable get_ref_coord_variable_x(int idx) {
         return {"int", "polygon_ref_" + to_string(idx) +  "_x"};
@@ -327,6 +388,7 @@ public:
             vector<pair<string,FT>> terms;
             foe(b, variables) terms.push_back({b.se,1});
             foe(v, enabled) terms.push_back(make_pair(v.se, -(max_partition_size + 100ll)));
+            assert(sz(terms) < max_partition_size - 1000);
             constraints.push_back({
                 terms,
                 "geq",
@@ -518,9 +580,12 @@ public:
         return solution;
     }
 
-    bool set_
-
 };
+
+FT MIPPackingHelpers::scale = 1; 
+FT MIPPackingHelpers::max_partition_size = 1; 
+FT MIPPackingHelpers::biginf = 1; 
+FT MIPPackingHelpers::inf = 1; 
 
 
 void OptimalPackingCallback::callback() {
@@ -737,8 +802,6 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
 
 PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
-    assert(inf * inf + 10000 < biginf);
-
     /*foe(p, _input.container) {
         p = {p.x() + 100, p.y() + 100};
     }
@@ -750,6 +813,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
     cout << "[c++] Optimal fast algorithm" << endl;
     MIPPackingHelpers helper (NULL, NULL);
+    helper.set_global_packing_parameter(_input);
 
     cout << "[c++] Scaling input" << endl;
     auto input = MIPPackingHelpers(NULL, NULL).scalesnap_input(_input);
@@ -793,7 +857,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
         cout << "[c++] Setting objective" << endl;
         // helper.set_max_objective_with_in_use_binaries(items, in_use_binaries);
-        problem.set_min_objective({{xys[0].fi.se, 1}, {xys[0].se.se, inf}, {in_use_binaries[0].se, -biginf}});
+        problem.set_min_objective({{xys[0].fi.se, 1}, {xys[0].se.se, MIPPackingHelpers::inf}, {in_use_binaries[0].se, -MIPPackingHelpers::biginf}});
 
         cout << "[c++] Adding items inside container constraints" << endl;
         helper.add_constraints_inside_convex_polygon(

@@ -30,3 +30,5 @@
 - try to use the fast integer approximation algorithm where we also add 2,3 or something like that in the correct direction
 - research what makes the integer approximation algorithm fail?
 - allow some pieces to move around and others to be part of the big piece. for example most recent pieces can move
+
+- is it possible to have two types of inf. One related to item coordinates and one for container?
