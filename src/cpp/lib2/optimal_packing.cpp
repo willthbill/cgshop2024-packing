@@ -2,8 +2,8 @@
 #include <CGAL/Aff_transformation_2.h>
 #include <CGAL/Boolean_set_operations_2.h>
 
+#include "lib2/convex_cover.cpp"
 #include "lib2/optimal_packing.h"
-
 #include "lib2/mip/gurobi.h"
 #include "lib2/configuration_space.h"
 #include "lib2/snap.h"
@@ -334,10 +334,15 @@ public:
 
                 // Compute convex cover (triangulation, partiton or something)
                 PartitionConstructor pc (polygon);
-                foe(tri, pc.get_constrained_delaunay_triangulation()) {
+                /*foe(tri, pc.get_constrained_delaunay_triangulation()) {
                     partition.push_back(tri);
+                }*/
+                auto cover = ConvexCover::get_convex_cover(polygon);
+                debug(sz(cover), sz(pc.get_constrained_delaunay_triangulation()));
+                foe(pol, cover) {
+                    partition.push_back(pol);
                 }
-                // partition = pc.get_approx_convex_partition();
+
                 foe(pol, partition) assert_is_integer_polygon(pol);
             }
         }
@@ -802,15 +807,6 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
 
 PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
-    /*foe(p, _input.container) {
-        p = {p.x() + 100, p.y() + 100};
-    }
-    foe(item, _input.items) {
-        foe(p, item.pol) {
-            p = {p.x() + 100, p.y() + 100};
-        }
-    }*/
-
     cout << "[c++] Optimal fast algorithm" << endl;
     MIPPackingHelpers helper (NULL, NULL);
     helper.set_global_packing_parameter(_input);
@@ -818,24 +814,21 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
     cout << "[c++] Scaling input" << endl;
     auto input = MIPPackingHelpers(NULL, NULL).scalesnap_input(_input);
 
-    cout << "[c++] Sorting:" << endl;
-    // TODO: this order and the order when getting the output does not match (since the items are approximated above)!!!!!
+    cout << "[c++] Expanding items" << endl;
     input.items = input.items.expand();
+
+    cout << "[c++] Sorting items" << endl;
     vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items);
     input.items = permute(input.items, sorted_idxs);
-    foe(item, input.items) {
-        cout << "    " << item.value.to_double() << " " << item.pol.area().to_double() << " " << (item.value / item.pol.area()).to_double() << endl;
-    }
 
     auto original_in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
     auto original_xys = helper.get_and_add_xy_ref_variables(sz(input.items));
 
     map<string,FT> solution;
-    foe(p, original_in_use_binaries) solution[p.se] = 0; // just for testing
-
     Polygon_set existing;
     int number_of_included_items = 0;
     fon(i, sz(input.items)) {
+        cout << "[c++] Iteration " << i << " / " << sz(input.items) << endl;
         auto& item = input.items[i];
         Gurobi_MIP problem;
         MIPPackingHelpers helper (&problem, NULL);
