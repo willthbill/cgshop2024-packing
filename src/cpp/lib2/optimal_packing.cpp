@@ -333,12 +333,11 @@ public:
                 foe(hole, polygon.holes()) assert_is_integer_polygon(hole);
 
                 // Compute convex cover (triangulation, partiton or something)
-                PartitionConstructor pc (polygon);
-                /*foe(tri, pc.get_constrained_delaunay_triangulation()) {
+                /*PartitionConstructor pc (polygon);
+                foe(tri, pc.get_constrained_delaunay_triangulation()) {
                     partition.push_back(tri);
                 }*/
                 auto cover = ConvexCover::get_convex_cover(polygon);
-                debug(sz(cover), sz(pc.get_constrained_delaunay_triangulation()));
                 foe(pol, cover) {
                     partition.push_back(pol);
                 }

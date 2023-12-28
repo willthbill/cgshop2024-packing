@@ -27,7 +27,7 @@ public:
     }
     static vector<Polygon> get_convex_cover(Polygon_with_holes& input_polygon) {
         PartitionConstructor partition (input_polygon);
-        // partition.add_extension_segments();
+        // partition.add_extension_segments(); results in non-integral coordinates
         auto extension_triangulation = partition.get_constrained_delaunay_triangulation();
 
         CHGraph chgraph_extension (input_polygon, extension_triangulation, "unset");
