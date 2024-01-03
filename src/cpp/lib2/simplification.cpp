@@ -1,12 +1,16 @@
 #include<bits/stdc++.h>
 #include <CGAL/Polyline_simplification_2/simplify.h>
-
-#include "lib/util/cgal.h"
-#include "lib/util/geometry_utils.h"
+#include <CGAL/minkowski_sum_2.h>
 
 namespace PS = CGAL::Polyline_simplification_2;
 typedef PS::Stop_above_cost_threshold        Stop;
 typedef PS::Squared_distance_cost            Cost;
+
+#include "lib2/simplification.h"
+#include "lib/util/cgal.h"
+#include "lib/util/geometry_utils.h"
+#include "lib/util/common.h"
+#include "lib/util/debug.h"
 
 using namespace std;
 
@@ -26,61 +30,45 @@ bool is_completely_inside(Polygon_set a, Polygon_set b) {
     return t.is_empty();
 }
 
-class SimplifyExpand {
-public:
-    static Polygon_set run(Polygon_set& pset) {
+Polygon_set SimplifyExpand::run(Polygon_set& pset, FT scale) {
+    Polygon_set res;
+    foe(pwh, to_polygon_vector(pset)) {
+        res.join(run(pwh, scale));
     }
-    static Polygon run(Polygon& pol, bool inside=false) {
-        // Built unit square
-        Polygon square;
-        {
-            square.push_back(Point(0,0));
-            square.push_back(Point(1,0));
-            square.push_back(Point(1,1));
-            square.push_back(Point(0,1));
-        }
-        // Get configuration space for the unit square
-        Polygon_with_holes annulus;
-        if(inside) {
-            auto t = get_complement(Polygon_set(pol));
-            pol.reverse_orientation();
-            auto sum = Polygon_set(CGAL::minkowski_sum_2(pol, square));
-            if(sum.number_of_holes() == 0) {
-                return Polygon();
-           }
-        } else {
-            auto sum = Polygon_set(CGAL::minkowski_sum_2(pol, square));
-            sum.difference(pol);
-            assert(sum.number_of_polygons_with_holes() == 1);
-            annulus = to_polygon_vector(sum)[0];
-        }
-        assert(annulus.number_of_holes() == 1);
-        /*auto config_space = ConfigurationSpace(
-            Polygon_set(pwh),
-            square,
-            get_centroid(square)
-        ).space;*/
-        // Simplify configuration space
-        Polygon_with_holes polygon = PS::simplify(polygon, Cost(), Stop(0.25));
-        // Make it integral
-        polygon = get_complement(
-            SnapToGrid(get_complement(polygon)).space
-        );
-        return polygon;
+    return res;
+}
+
+Polygon SimplifyExpand::run(Polygon& pol, FT scale) {
+    Polygon_with_holes t (pol);
+    auto res = run(t, scale);
+    assert(res.number_of_holes() == 0);
+    return res.outer_boundary();
+}
+
+Polygon_with_holes SimplifyExpand::run(Polygon_with_holes& pwh, FT scale) {
+    cout << "[c++] Simplication input number of vertices: " << get_number_of_vertices(Polygon_set(pwh)) << endl;
+    /*debug("input");
+    foe(p, pwh.outer_boundary()) {
+        debug(p);
+    }*/
+    Polygon square;
+    {
+        square.push_back(Point(-scale,-scale));
+        square.push_back(Point(scale,-scale));
+        square.push_back(Point(scale,scale));
+        square.push_back(Point(-scale,scale));
     }
-    static Polygon_with_holes run(Polygon_with_holes& pwh) {
-        cout << "[c++] Simplication input number of vertices: " << get_number_of_vertices(Polygon_set(pwh)) << endl;
-        Polygon square;
-        {
-            square.push_back(Point(0,0));
-            square.push_back(Point(1,0));
-            square.push_back(Point(1,1));
-            square.push_back(Point(0,1));
-        }
-        auto sum = CGAL::minkowski_sum_2(pwh, square);
-        Polygon_with_holes polygon = PS::simplify(sum, Cost(), Stop(0.25 * 0.25));
-        assert(is_completely_inside(Polygon_set(polygon), Polygon_set(pwh)));
-        cout << "[c++] Simplication output number of vertices: " << get_number_of_vertices(Polygon_set(polygon)) << endl;
-        return polygon;
-    }
-};
+    auto sum = CGAL::minkowski_sum_2(pwh, square);
+    /*debug("sum");
+    foe(p, sum.outer_boundary()) {
+        debug(p);
+    }*/
+    Polygon_with_holes polygon = PS::simplify(sum, Cost(), Stop((scale * 1.99).to_double()));
+    /*debug("res");
+    foe(p, polygon.outer_boundary()) {
+        debug(p);
+    }*/
+    cout << "[c++] Simplication output number of vertices: " << get_number_of_vertices(Polygon_set(polygon)) << endl;
+    assert(is_completely_inside(Polygon_set(polygon), Polygon_set(pwh)));
+    return polygon;
+}

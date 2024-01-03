@@ -117,9 +117,13 @@ add_library(convex_cover SHARED src/cpp/lib2/convex_cover.cpp)
 target_precompile_headers(convex_cover PUBLIC ${PRECOMPILE_HEADERS})
 target_link_libraries(convex_cover ${CGALLIB} partition_constructor visgraph cliquecover geometry_utils)
 
+add_library(simplification SHARED src/cpp/lib2/simplification.cpp)
+target_precompile_headers(simplification PUBLIC ${PRECOMPILE_HEADERS})
+target_link_libraries(simplification ${CGALLIB} geometry_utils)
+
 add_library(optimal_packing SHARED src/cpp/lib2/optimal_packing.cpp)
 target_precompile_headers(optimal_packing PUBLIC ${PRECOMPILE_HEADERS})
-target_link_libraries(optimal_packing ${CGALLIB} partition_constructor gurobi_mip configuration_space geometry_utils io snap convex_cover)
+target_link_libraries(optimal_packing ${CGALLIB} partition_constructor gurobi_mip configuration_space geometry_utils io snap convex_cover simplification)
 
 ### algorithms ###
 #add_library(dummy_algorithm SHARED src/cpp/algorithms/dummy.cpp)

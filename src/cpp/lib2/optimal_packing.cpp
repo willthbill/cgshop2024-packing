@@ -2,6 +2,7 @@
 #include <CGAL/Aff_transformation_2.h>
 #include <CGAL/Boolean_set_operations_2.h>
 
+#include "lib2/simplification.h"
 #include "lib2/convex_cover.cpp"
 #include "lib2/optimal_packing.h"
 #include "lib2/mip/gurobi.h"
@@ -23,6 +24,16 @@ using namespace std;
 // TODO: actually calculate bounds (inf, biginf, ...)
 
 
+int get_number_of_vertices(Polygon_set pset) {
+    int res = 0;
+    foe(pwh, to_polygon_vector(pset)) {
+        res += pwh.outer_boundary().size();
+        foe(hole, pwh.holes()) {
+            res += hole.size();
+        }
+    }
+    return res;
+}
 vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
     vector<Polygon_with_holes> pols;
     pset.polygons_with_holes (back_inserter(pols));
@@ -1075,6 +1086,15 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input) {
                     cout << "[c++] Found lowest integral point: " << p << endl;
                     add_item(item, p);
                     existing.join(item.move_ref_point(p).pol);
+                    if(get_number_of_vertices(existing) > 100) {
+                        FT scale = 50000;
+                        while(get_number_of_vertices(existing) > 50) {
+                            debug(scale);
+                            debug(get_number_of_vertices(existing));
+                            existing = SimplifyExpand::run(existing, scale);
+                            scale *= 1.5;
+                        }
+                    }
                     number_of_included_items++;
                     goto next_item;
                 }
