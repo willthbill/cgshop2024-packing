@@ -1023,3 +1023,66 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
     return output;
 }
+
+PackingOutput HeuristicPackingNOMIP::run(PackingInput _input) {
+    auto input = _input;
+
+    cout << "[c++] Expanding items" << endl;
+    input.items = input.items.expand();
+
+    cout << "[c++] Sorting items" << endl;
+    MIPPackingHelpers helper (NULL, NULL);
+    vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items); // TODO: does this even sort non-increasingly?
+    input.items = permute(input.items, sorted_idxs);
+
+    PackingOutput output (_input);
+    auto add_item = [&](Item& item, Point p) {
+        assert(is_integer(p.x()));
+        assert(is_integer(p.y()));
+        Item new_item = item.move_ref_point(p);
+        // assert(is_completely_inside(Polygon_set(input.container), Polygon_set(new_item.pol)));
+        output.add_item(new_item);
+    };
+    Polygon_set existing;
+    int number_of_included_items = 0;
+    fon(i, sz(input.items)) {
+        cout << "[c++] Iteration " << (i + 1) << " / " << sz(input.items) << endl;
+        auto& item = input.items[i];
+
+        cout << "[c++] Computing configuration space" << endl;
+        Polygon_set disallowed_space = get_complement(Polygon_set(input.container));
+        disallowed_space.join(existing);
+        auto config_space = ConfigurationSpace(
+            disallowed_space,
+            item.pol,
+            item.get_reference_point()
+        ).space;
+
+        cout << "[c++] Finding lowest integral point" << endl;
+        vector<Point> vertices;
+        foe(pwh, to_polygon_vector(config_space)) {
+            foe(pol, pwh.outer_boundary()) vertices.push_back(pol);
+            // TODO: holes needed?
+        }
+        sort(vertices.begin(), vertices.end(), [](Point& a, Point& b) {
+            if(a.y() == b.y()) return a.x() < b.x();
+            return a.y() < b.y();
+        });
+        foe(v, vertices) {
+            foab(dy, -10, 5) foab(dx, -10, 5) { // TODO: probably don't need to check negative
+                Point p (floor_exact(v.x() + dx), floor_exact(v.y() + dy));
+                if(config_space.oriented_side(p) != CGAL::ON_NEGATIVE_SIDE) {
+                    cout << "[c++] Found lowest integral point: " << p << endl;
+                    add_item(item, p);
+                    existing.join(item.move_ref_point(p).pol);
+                    number_of_included_items++;
+                    goto next_item;
+                }
+            }
+        }
+next_item:
+        cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
+    }
+
+    return output;
+}

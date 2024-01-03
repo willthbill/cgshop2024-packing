@@ -76,6 +76,28 @@ class InputConfiguration(Configuration):
                 idx += 1
         return res
 
+    # fractional knapsack
+    def get_max_number_of_placed_items(self):
+        a = []
+        for idx in range(len(self.items)):
+            a.append([
+                math.area(self.items[idx]),
+                self.quantities[idx]
+            ])
+        a.sort()
+        area = math.area(self.container)
+        idx = 0
+        res = 0
+        while area > 0 and idx < len(a):
+            if a[idx][0] > area:
+                break
+            am = min(a[idx][1], area // a[idx][0])
+            a[idx][1] -= am
+            area -= am * a[idx][0]
+            res += am
+            if a[idx][1] == 0:
+                idx += 1
+        return res
 
 
 class OutputConfiguration(Configuration):

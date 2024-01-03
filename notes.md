@@ -35,3 +35,6 @@
 - there are some unnecessary variables/constraints:
     - in iteminitem and inside container constraints we don't need to condition it on in_use_binaries, since we have the extra constraint that the sum of the helper binaries should be at least one.??
     - in inside pset basically the same thing???
+
+- how do we find the lowest integral coordinate (for the NOMIP solution)?
+- why does the NOMIP solution give different on jigsaw_cf3_xcd14250_28 that MIP based?

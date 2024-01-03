@@ -58,3 +58,13 @@ public:
     PackingOutput run(PackingInput); 
 
 };
+
+class HeuristicPackingNOMIP {
+
+private:
+
+public:
+
+    PackingOutput run(PackingInput); 
+
+};

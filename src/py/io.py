@@ -58,7 +58,7 @@ def read_instances(paths, sort=None, expand=False):
     for path in paths:
         # Expand wildcards
         if '*' in path:
-            for expanded_path in glob.glob(path):
+            for expanded_path in glob.glob(path, recursive=True):
                 yield read_instance(expanded_path, sort=sort, expand=expand)
         # Handle directories
         elif os.path.isdir(path):
