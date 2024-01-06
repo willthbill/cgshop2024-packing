@@ -35,6 +35,30 @@ Polygon SnapToGrid::get_single_polygon() {
     assert(false);
 }
 
+vector<Polygon> fix_repeated_points(Polygon pol) {
+    vector<Point> points;
+    foe(p, pol) points.push_back(p);
+    map<Point, int> mp;
+    int idx = -1;
+    fon(i, sz(points)) {
+        auto& p = points[i];
+        if(mp.count(p)) {
+            idx = i;
+            break;
+        }
+        mp[p] = i;
+    }
+    if(idx == -1) return {pol};
+    Polygon a, b;
+    for(int i = 0; i < mp[points[idx]]; i++) a.push_back(points[i]);
+    for(int i = mp[points[idx]]; i < idx; i++) b.push_back(points[i]);
+    for(int i = idx; i < sz(points); i++) a.push_back(points[i]);
+    vector<Polygon> res;
+    foe(p, fix_repeated_points(a)) res.push_back(p);
+    foe(p, fix_repeated_points(b)) res.push_back(p);
+    return res;
+}
+
 // this does not work exactly right. we check if the segment intersects in two district points.
 bool does_segment_cut(Polygon& p, Segment s) {
     Point touch (-1e9, -1e9);
@@ -149,6 +173,8 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
         }
     }
 
+    debug("yolo1");
+
     // Snapping
     Polygon_set pset;
     pset.insert(pol);
@@ -207,16 +233,22 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
             }*/
         }
     };
+    debug("yolo2");
     add_integer_points(pol.outer_boundary());
+    debug("yolo3");
     foe(hole, pol.holes()) {
         add_integer_points(hole);
     }
+    debug("yolo4");
     assert(pset.number_of_polygons_with_holes() == 1);
 
     Polygon_with_holes ep;
     foe(pwh, to_polygon_vector(pset)) ep = pwh;
+    debug("yolo5");
 
-    auto get_integer_polygon = [](Polygon pol) {
+    auto get_integer_polygon = [](Polygon pol, bool safe_option) {
+        assert(pol.orientation() == CGAL::COUNTERCLOCKWISE);
+        debug("hello4");
         Polygon res;
         foe(p, pol) {
             bool is_int = is_integer(p.x()) && is_integer(p.y());
@@ -224,18 +256,45 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
                 res.push_back(p);
             }
         }
-        if(!res.is_simple()) {
+        debug("hello1");
+        if(!res.is_simple() || res.orientation() != CGAL::COUNTERCLOCKWISE) {
             cout << "WARNING: integer-only polygon is not simple" << endl;
-            return get_convex_hull_of_polygons({res}); // this is bad!
+            if(safe_option) res = Polygon();
+            else res = get_convex_hull_of_polygons({res}); // this is bad!
         }
+        debug("hello2");
+        if(sz(res) < 3 || res.area() == FT(0)) {
+            cout << "WARNING: integer-only polygon has less than 3 points" << endl;
+            return Polygon();
+        }
+        debug("hello3");
+        assert(res.is_simple());
+        debug("hello4");
+        assert(res.orientation() == CGAL::COUNTERCLOCKWISE);
         return res;
     };
-    Polygon_with_holes res (get_integer_polygon(ep.outer_boundary()));
+    debug("yolo6");
+    Polygon_with_holes res (get_integer_polygon(ep.outer_boundary(), false));
+    debug("heyothere");
     foe(hole, ep.holes()) {
         auto t = hole; t.reverse_orientation();
-        if(!is_completely_inside(Polygon_set(pol.outer_boundary()), Polygon_set(t))) continue;
-        res.add_hole(get_integer_polygon(hole));
+        auto int_hole = get_integer_polygon(t, true);
+        debug("hello5");
+        int_hole.reverse_orientation();
+        debug("hello6");
+        debug(sz(int_hole));
+        // Catch that hole touches the outer boundary
+        try {
+            if(sz(int_hole) && is_completely_inside(Polygon_set(res), Polygon_set(int_hole))) {
+                debug("hello7");
+                res.add_hole(int_hole);
+            }
+        } catch(const std::exception& e) {
+            continue;
+        }
+        
     }
+    debug("letsgooo");
 
     assert(is_completely_inside(res,pol));
 
@@ -325,7 +384,11 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
     //assert(pred.is_completely_inside_slow(pol));
     assert(is_completely_inside(reduced_res,pol));
     assert_is_integer_polygon(reduced_res.outer_boundary());
-    foe(hole, reduced_res.holes()) assert_is_integer_polygon(hole);
+    assert(reduced_res.outer_boundary().is_simple());
+    foe(hole, reduced_res.holes()) {
+        assert_is_integer_polygon(hole);
+        assert(hole.is_simple());
+    }
     cout << "[c++, snapper]: used generator-based snapping" << endl;
     return reduced_res;
 }

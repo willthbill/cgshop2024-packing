@@ -1085,16 +1085,42 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input) {
                 if(config_space.oriented_side(p) != CGAL::ON_NEGATIVE_SIDE) {
                     cout << "[c++] Found lowest integral point: " << p << endl;
                     add_item(item, p);
+                    debug("heyo1");
                     existing.join(item.move_ref_point(p).pol);
-                    if(get_number_of_vertices(existing) > 100) {
+                    debug("heyo2");
+                    if(get_number_of_vertices(existing) > 50) {
                         FT scale = 50000;
                         while(get_number_of_vertices(existing) > 50) {
-                            debug(scale);
-                            debug(get_number_of_vertices(existing));
+                            cout << "scale: " << scale.to_double() << ", ";
+                            cout << "#vertices: " << get_number_of_vertices(existing) << endl;
                             existing = SimplifyExpand::run(existing, scale);
-                            scale *= 1.5;
+                            scale *= 1.1;
                         }
                     }
+                    debug("heyo3");
+                    foe(p, item.move_ref_point(p).pol) {
+                        Polygon box;
+                        {
+                            box.push_back(Point(p.x() - 1, p.y() - 1));
+                            box.push_back(Point(p.x() + 1, p.y() - 1));
+                            box.push_back(Point(p.x() + 1, p.y() + 1));
+                            box.push_back(Point(p.x() - 1, p.y() + 1));
+                        }
+                        existing.join(box);
+                    }
+                    debug("heyo4");
+                    // turn to integer polygon
+                    existing = SnapToGrid(existing).space;
+                    debug("yo1");
+                    if(!existing.is_empty()) {
+                        debug("outer boundary");
+                        debug(sz(to_polygon_vector(existing)));
+                        auto pol = to_polygon_vector(existing)[0];
+                        foe(p, pol.outer_boundary()) {
+                            debug(p);
+                        }
+                    }
+                    debug("yo2");
                     number_of_included_items++;
                     goto next_item;
                 }

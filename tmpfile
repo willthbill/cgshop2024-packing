@@ -1,0 +1,25 @@
+    auto get_integer_polygon = [](Polygon pol, bool safe = false) {
+        assert(pol.orientation() == CGAL::COUNTERCLOCKWISE);
+        Polygon res;
+        foe(p, pol) {
+            bool is_int = is_integer(p.x()) && is_integer(p.y());
+            if(is_int) {
+                res.push_back(p);
+            }
+        }
+        if(res.orientation() != CGAL::COUNTERCLOCKWISE || !res.is_simple()) {
+            cout << "WARNING: integer-only polygon is not simple" << endl;
+            if(safe) return Polygon();
+            else return get_convex_hull_of_polygons({res}); // this is bad!
+        }
+        return res;
+    };
+    Polygon_with_holes res (get_integer_polygon(ep.outer_boundary(), false));
+    debug("heyyo");
+    foe(hole, ep.holes()) {
+        auto t = hole; t.reverse_orientation();
+        if(!is_completely_inside(Polygon_set(pol.outer_boundary()), Polygon_set(t))) continue;
+        auto int_hole = get_integer_polygon(t, true);
+        int_hole.reverse_orientation();
+        if(sz(int_hole)) res.add_hole(int_hole);
+    }

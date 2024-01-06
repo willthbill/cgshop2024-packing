@@ -46,29 +46,32 @@ Polygon SimplifyExpand::run(Polygon& pol, FT scale) {
 }
 
 Polygon_with_holes SimplifyExpand::run(Polygon_with_holes& pwh, FT scale) {
-    cout << "[c++] Simplication input number of vertices: " << get_number_of_vertices(Polygon_set(pwh)) << endl;
+    // assert(pwh.outer_boundary().is_simple());
+    // cout << "[c++] Simplication input number of vertices: " << get_number_of_vertices(Polygon_set(pwh)) << endl;
     /*debug("input");
     foe(p, pwh.outer_boundary()) {
         debug(p);
     }*/
     Polygon square;
+    FT factor = 1;
     {
-        square.push_back(Point(-scale,-scale));
-        square.push_back(Point(scale,-scale));
-        square.push_back(Point(scale,scale));
-        square.push_back(Point(-scale,scale));
+        square.push_back(Point(-factor * scale,-scale * factor));
+        square.push_back(Point(factor * scale,-scale * factor));
+        square.push_back(Point(factor * scale,scale * factor));
+        square.push_back(Point(-factor * scale,scale * factor));
     }
     auto sum = CGAL::minkowski_sum_2(pwh, square);
     /*debug("sum");
     foe(p, sum.outer_boundary()) {
         debug(p);
     }*/
-    Polygon_with_holes polygon = PS::simplify(sum, Cost(), Stop((scale * 1.99).to_double()));
+    Polygon_with_holes polygon = PS::simplify(sum, Cost(), Stop((scale * 2).to_double()));
     /*debug("res");
     foe(p, polygon.outer_boundary()) {
         debug(p);
     }*/
-    cout << "[c++] Simplication output number of vertices: " << get_number_of_vertices(Polygon_set(polygon)) << endl;
+    // cout << "[c++] Simplication output number of vertices: " << get_number_of_vertices(Polygon_set(polygon)) << endl;
     assert(is_completely_inside(Polygon_set(polygon), Polygon_set(pwh)));
+    //assert(polygon.outer_boundary().is_simple());
     return polygon;
 }
