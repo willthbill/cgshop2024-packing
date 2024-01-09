@@ -11,6 +11,8 @@ RUN pacman -Syu --noconfirm && aur-install gurobi
 
 RUN pacman -Syu --noconfirm sudo
 
+RUN pacman -Syu --noconfirm time
+
 # Production
 #ARG UPDATE_LIB=false
 #ARG GITHUB_AUTH=notoken
@@ -43,6 +45,7 @@ RUN echo 'source /home/myuser/.bashrc' >> ~/.bash_profile
 # Set the default command for the container
 WORKDIR /app/max-polygon-packing
 RUN sudo mkdir -p /opt/gurobi
+
 
 # quick fix
 RUN sudo ln -sf /usr/lib/libgurobi_g++8.5.a /usr/lib/libgurobi_c++.a

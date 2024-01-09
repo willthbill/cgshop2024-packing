@@ -94,7 +94,7 @@ def generate_run_id():
 
 def get_output_directory_for_instance(name, input_filename):
     unique_part = hashlib.sha1(
-        f"{name}==={input_filename}==={generate_time_based_id()}".encode()
+        f"{name}==={input_filename}".encode()
     ).hexdigest()[:8]
     filename = f"{name}_{unique_part}"
     return filename
@@ -115,7 +115,8 @@ def write_output(dir, name, input_filename, run_id, output_conf):
         'weak_upper_bound': output_conf.input_conf.get_weak_upper_bound(),
         'strong_upper_bound': output_conf.input_conf.get_strong_upper_bound(),
     }
-
+    
+    assert not os.path.exists(output_filename)
     with open(output_filename, 'w') as f:
         output = {
             "type": "cgshop2024_solution",
@@ -128,10 +129,14 @@ def write_output(dir, name, input_filename, run_id, output_conf):
         }
         json.dump(output, f, indent=4)
 
-    with open(os.path.join(dir, "metadata.json"), 'w') as f:
+    metadata_filename = os.path.join(dir, "metadata.json")
+    assert not os.path.exists(metadata_filename)
+    with open(metadata_filename, 'w') as f:
         json.dump(metadata, f, indent=4)
 
-    with open(os.path.join(dir, "env.txt"), 'w') as f:
+    env_filename = os.path.join(dir, "env.txt")
+    assert not os.path.exists(env_filename)
+    with open(env_filename, 'w') as f:
         for key, value in os.environ.items():
             f.write(f'{key}: {value}\n')
 
