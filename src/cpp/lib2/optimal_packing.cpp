@@ -1217,7 +1217,7 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
         foe(item, items) sum += item.pol.area();
         return sum / FT(sz(items));
     };
-    FT max_number_of_items_in_square = 100;
+    FT max_number_of_items_in_square = 30;
     assert(max_number_of_items_in_square >= 5);
     // square_size * square_size / get_average_area(input.items) = max_number_of_items_in_square
     // =>
@@ -1226,33 +1226,28 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     assert(square_size >= 10);
 
     // Get grid dimensions
-    Point lowest = get_lowest_point(input.container);
-
-    auto tmp_container = input.container;
-    foe(p, tmp_container) p = Point(p.x(), p.y() * FT(-1));
-    Point highest = get_lowest_point(input.container);
-    highest = Point(highest.x(), highest.y() * -1);
-
-    foe(p, tmp_container) p = Point(p.y(), p.x());
-    Point leftmost = get_lowest_point(tmp_container);
-    leftmost = Point(leftmost.y(), leftmost.x());
-
-    foe(p, tmp_container) p = Point(p.x(), p.y() * FT(-1));
-    Point rightmost = get_lowest_point(input.container);
-    rightmost = Point(rightmost.x(), rightmost.y() * -1);
-    rightmost = Point(rightmost.y(), rightmost.x());
-
+    auto bbox = get_bounding_box(input.container);
+    Point lowest = bbox[0];
+    Point rightmost = bbox[2];
+    Point highest= bbox[2];
+    Point leftmost = bbox[0];
     Point start (leftmost.x() - FT(2), lowest.y() - FT(2)); // -2 should not be necessary
-    debug(lowest, highest);
-    debug(leftmost, rightmost);
     FT width = rightmost.x() - leftmost.x() + FT(4);
     FT height = highest.y() - lowest.y() + FT(4);
     FT number_of_steps_x = ceil_exact(width / square_size);
     FT number_of_steps_y = ceil_exact(height / square_size);
+    // TODO: potentially recalculate square size
     assert(width >= 10);
     assert(height >= 10);
     assert(number_of_steps_x >= 1);
     assert(number_of_steps_y >= 1);
+
+    cout << "[c++] Max number of items in a square: " << max_number_of_items_in_square.to_double() << endl;
+    cout << "[c++] Square size: " << square_size.to_double() << endl;
+    cout << "[c++] Width of container: " << width.to_double() << endl;
+    cout << "[c++] Height of container: " << height.to_double() << endl;
+    cout << "[c++] Number of steps in x direction: " << number_of_steps_x.to_double() << endl;
+    cout << "[c++] Number of steps in y direction: " << number_of_steps_y.to_double() << endl;
 
     // Generate containers
     vector<Polygon> containers;
@@ -1267,7 +1262,7 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
                 square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + (j + FT(1)) * square_size));
                 square.push_back(Point(start.x() + i * square_size, start.y() + (j + FT(1)) * square_size));
             }
-            Polygon_set allowed_space (get_complement(Polygon_set(input.container)));
+            Polygon_set allowed_space (Polygon_set(input.container));
             allowed_space.intersection(Polygon_set(square));
             if(allowed_space.is_empty()) continue;
             assert(to_polygon_vector(allowed_space).size() == 1);
@@ -1275,24 +1270,31 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
             containers.push_back(to_polygon_vector(allowed_space)[0].outer_boundary());
         }
     }
+    int number_of_containers = sz(containers);
+    assert(number_of_containers <= number_of_steps_x * number_of_steps_y);
+    cout << "[c++] Number of boxes: " << number_of_containers << endl;
 
     // Divide items into containers
-    vector<ItemsContainer> items_containers (sz(containers));
+    vector<ItemsContainer> items_containers (number_of_containers);
+    vector<vector<int>> items_indices (number_of_containers);
     fon(i, sz(input.items)) {
         auto& item = input.items[i];
         assert(item.quantity == 1);
-        Item new_item {item.value, item.quantity, item.pol, i, Vector(0,0)};
-        items_containers[i % sz(items_containers)].add_item(new_item);
+        auto& item_container = items_containers[i % number_of_containers];
+        Item new_item {item.value, 1, item.pol, sz(item_container), Vector(0,0)};
+        item_container.add_item(new_item);
+        items_indices[i % number_of_containers].push_back(i);
     }
     
     // Solve each container
     PackingOutput output (_input);
-    fon(i, sz(containers)) {
+    fon(i, number_of_containers) {
+        assert(sz(items_containers[i]) <= max_number_of_items_in_square * 1.05 + 2);
         PackingInput container_input {containers[i], items_containers[i]};
-        PackingOutput toutput = HeuristicPackingNOMIP().run(input);
+        PackingOutput toutput = HeuristicPackingNOMIP().run(container_input);
         foe(item, toutput.items) {
             assert(item.quantity == 1);
-            Item new_item {item.value, 1, item.pol, input.items[item.idx].idx, Vector(0,0)};
+            Item new_item {item.value, 1, item.pol, input.items[items_indices[i][item.idx]].idx, Vector(0,0)};
             output.add_item(new_item);
         }
     }

@@ -23,14 +23,18 @@ for name, filename, input_conf in read_instances(instance_files.split(";")):
         sys.stdout = StreamTee(f'{dir}/stdout.txt', sys.stdout)
         sys.stderr = StreamTee(f'{dir}/stderr.txt', sys.stderr)
 
-    print(f"[py] Running algorithm on instance, {name} ({filename})")
-    print(f"[py] Number of items: {input_conf.get_number_of_items()}")
-    print(f"[py] Number of vertices on container: {input_conf.get_number_of_vertices_on_container()}")
-    print(f"[py] Max value: {input_conf.get_max_value()}")
-    print(f"[py] Max x/y coord: {input_conf.get_max_xy()}")
-    print(f"[py] Weak upper bound: {input_conf.get_weak_upper_bound()}")
-    print(f"[py] Strong upper bound: {input_conf.get_strong_upper_bound()}")
-    print(f"[py] Max number of placed items (upper bound): {input_conf.get_max_number_of_placed_items()}")
+    def print_information():
+        print(f"[py] Running algorithm on instance, {name} ({filename})")
+        print(f"[py] Number of items: {input_conf.get_number_of_items()}")
+        print(f"[py] Number of vertices on container: {input_conf.get_number_of_vertices_on_container()}")
+        print(f"[py] Max value: {input_conf.get_max_value()}")
+        print(f"[py] Max x/y coord: {input_conf.get_max_xy()}")
+        print(f"[py] Weak upper bound: {input_conf.get_weak_upper_bound()}")
+        print(f"[py] Strong upper bound: {input_conf.get_strong_upper_bound()}")
+        print(f"[py] Max number of placed items (upper bound): {input_conf.get_max_number_of_placed_items()}")
+
+    print_information()
+
     if only_stats:
         print()
         continue
@@ -40,10 +44,8 @@ for name, filename, input_conf in read_instances(instance_files.split(";")):
     end_time = time.time()
     time_taken = end_time - start_time
 
+    print_information()
     print(f"[py] Function execution time: {time_taken} seconds")
-    print(f"[py] Weak upper bound: {output_conf.input_conf.get_weak_upper_bound()}")
-    print(f"[py] Strong upper bound: {output_conf.input_conf.get_strong_upper_bound()}")
-    print(f"[py] Max number of placed items (upper bound): {input_conf.get_max_number_of_placed_items()}")
     print(f"[py] Score: {output_conf.get_score()}")
     print(f"[py] Finished on instance, {name} ({filename})")
 

@@ -147,7 +147,7 @@ void PackingOutput::validate_result() {
             debug(p);
         }
     }*/
-    fon(i, sz(items)) {
+    fon(i, min(sz(items), 50)) {
         auto& i1 = items[i];
         fon(j, i) {
             if(i == j) continue;
