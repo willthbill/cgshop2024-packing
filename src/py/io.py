@@ -55,19 +55,29 @@ def read_output_metadata(filename):
 
 
 def read_instances(paths, sort=None, expand=False):
+    # make a function that checks if a path is a json file
+    def is_json_file(path):
+        _, ext = os.path.splitext(path)
+        return ext.lower() == '.json'
+
     for path in paths:
         # Expand wildcards
         if '*' in path:
             for expanded_path in glob.glob(path, recursive=True):
+                if os.path.isdir(expanded_path):
+                    continue
+                if not is_json_file(expanded_path): continue
                 yield read_instance(expanded_path, sort=sort, expand=expand)
         # Handle directories
         elif os.path.isdir(path):
             for dirpath, _, filenames in os.walk(path):
                 for filename in filenames:
                     full_path = os.path.join(dirpath, filename)
+                    if not is_json_file(full_path): continue
                     yield read_instance(full_path, sort=sort, expand=expand)
         # Handle single files
         else:
+            if not is_json_file(path): continue
             yield read_instance(path, sort=sort, expand=expand)
 
 

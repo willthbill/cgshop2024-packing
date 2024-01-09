@@ -82,22 +82,22 @@ def run_sequentially(p):
             visualize(output_conf, show=True, preserve_coords=True)
         print("===========================\n")
 
-# def run_command(p):
-#     command = p[0]
-#     env = p[1]
-#     write_to = p[2]
-#     output_stderr = ""
-#     try:
-#         # output_stderr = subprocess.run(command, shell=True, check=False, env=env, stderr=subprocess.PIPE, text=True).stderr
-#         subprocess.run(command, shell=True, check=False, env=env)
-#     except subprocess.CalledProcessError as e:
-#         print(f"An error occurred: {e}")
-#     # print(output_stderr, file=sys.stderr)
-#     # if write_to is not None:
-#     #     assert not os.path.exists(write_to)
-#     #     with open(write_to, 'w') as f:
-#     #         f.write(output_stderr)
-#     print(f"Finished running {command}")
+def run_command(p):
+    command = p[0]
+    env = p[1]
+    write_to = p[2]
+    output_stderr = ""
+    try:
+        output_stderr = subprocess.run(command, shell=True, check=False, env=env, stderr=subprocess.PIPE, text=True).stderr
+        # subprocess.run(command, shell=True, check=False, env=env)
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred: {e}")
+    print(output_stderr, file=sys.stderr)
+    if write_to is not None:
+        assert not os.path.exists(write_to)
+        with open(write_to, 'w') as f:
+            f.write(output_stderr)
+    print(f"Finished running {command}")
 
 
 instance_files = os.environ["INSTANCE_FILES"]
@@ -113,20 +113,20 @@ if in_parallel:
 
     should_write, description, only_stats, run_id = get_environment_variables(os.environ)
 
-    inputs = []
-    for name, filename, input_conf in instances:
-        env = os.environ.copy()
-        env['INSTANCE_FILES'] = filename
-        env['RUN_ID'] = run_id
-        del env['MAX_THREADS']
-        inputs.append((
-            [(name, filename, input_conf)],
-            env
-        ))
+    # inputs = []
+    # for name, filename, input_conf in instances:
+    #     env = os.environ.copy()
+    #     env['INSTANCE_FILES'] = filename
+    #     env['RUN_ID'] = run_id
+    #     del env['MAX_THREADS']
+    #     inputs.append((
+    #         [(name, filename, input_conf)],
+    #         env
+    #     ))
     
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
-        executor.map(run_sequentially, inputs)
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
+    #     executor.map(run_sequentially, inputs)
     # with Pool(max_threads) as pool:
     #     pool.map(run_sequentially, inputs)
     # pool = Pool(processes=max_threads)
@@ -134,25 +134,25 @@ if in_parallel:
     # pool.close()
     # pool.join()
 
-    # commands = []
-    # for name, filename, input_conf in instances:
-    #     env = os.environ.copy()
-    #     env['INSTANCE_FILES'] = filename
-    #     env['RUN_ID'] = run_id
-    #     del env['MAX_THREADS']
-    #     dir = get_output_dir(run_id, name, filename)
-    #     if should_write:
-    #         if not os.path.exists(dir):
-    #             os.makedirs(dir, exist_ok=False)
-    #     commands.append((
-    #         "time -v ./bin/runpythonfile main.py",
-    #         env,
-    #         os.path.join(dir, "mem.txt") if should_write else None
-    #     ))
-    # with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
-    #     executor.map(run_command, commands)
+    commands = []
+    for name, filename, input_conf in instances:
+        env = os.environ.copy()
+        env['INSTANCE_FILES'] = filename
+        env['RUN_ID'] = run_id
+        del env['MAX_THREADS']
+        dir = get_output_dir(run_id, name, filename)
+        if should_write:
+            if not os.path.exists(dir):
+                os.makedirs(dir, exist_ok=False)
+        commands.append((
+            "./bin/runpythonfile main.py",
+            env,
+            os.path.join(dir, "mem.txt") if should_write else None
+        ))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
+        executor.map(run_command, commands)
     # with Pool(max_threads) as pool:
     #     pool.map(run_command, commands)
-# else:
-#     print("[py-manager] RUNNING IN SEQUENCE")
-#     run_sequentially(instances, os.environ)
+else:
+    print("[py-manager] RUNNING IN SEQUENCE")
+    run_sequentially((instances, os.environ))
