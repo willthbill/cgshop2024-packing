@@ -1079,6 +1079,76 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input) {
             if(a.y() == b.y()) return a.x() < b.x();
             return a.y() < b.y();
         });
+        if(sz(vertices)) {
+            foe(v, vertices) {
+                foab(dy, -10, 5) foab(dx, -10, 5) { // TODO: probably don't need to check negative
+                    Point p (floor_exact(v.x() + dx), floor_exact(v.y() + dy));
+                    if(config_space.oriented_side(p) != CGAL::ON_NEGATIVE_SIDE) {
+                        cout << "[c++] Found lowest integral point: " << p << endl;
+                        add_item(item, p);
+                        existing.join(item.move_ref_point(p).pol);
+                        // turn to integer polygon
+                        // existing = SnapToGrid(existing).space;
+                        number_of_included_items++;
+                        goto next_item;
+                    }
+                }
+            }
+            assert(false);
+        }
+next_item:
+        cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
+    }
+
+    return output;
+}
+
+// WITH SIMPLICATION BUT IT DOES NOT WORK WELL
+/*
+PackingOutput HeuristicPackingNOMIP::run(PackingInput _input) {
+    auto input = _input;
+
+    cout << "[c++] Expanding items" << endl;
+    input.items = input.items.expand();
+
+    cout << "[c++] Sorting items" << endl;
+    MIPPackingHelpers helper (NULL, NULL);
+    vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items); // TODO: does this even sort non-increasingly?
+    input.items = permute(input.items, sorted_idxs);
+
+    PackingOutput output (_input);
+    auto add_item = [&](Item& item, Point p) {
+        assert(is_integer(p.x()));
+        assert(is_integer(p.y()));
+        Item new_item = item.move_ref_point(p);
+        // assert(is_completely_inside(Polygon_set(input.container), Polygon_set(new_item.pol)));
+        output.add_item(new_item);
+    };
+    Polygon_set existing;
+    int number_of_included_items = 0;
+    fon(i, sz(input.items)) {
+        cout << "[c++] Iteration " << (i + 1) << " / " << sz(input.items) << endl;
+        auto& item = input.items[i];
+
+        cout << "[c++] Computing configuration space" << endl;
+        Polygon_set disallowed_space = get_complement(Polygon_set(input.container));
+        disallowed_space.join(existing);
+        auto config_space = ConfigurationSpace(
+            disallowed_space,
+            item.pol,
+            item.get_reference_point()
+        ).space;
+
+        cout << "[c++] Finding lowest integral point" << endl;
+        vector<Point> vertices;
+        foe(pwh, to_polygon_vector(config_space)) {
+            foe(pol, pwh.outer_boundary()) vertices.push_back(pol);
+            // TODO: holes needed?
+        }
+        sort(vertices.begin(), vertices.end(), [](Point& a, Point& b) {
+            if(a.y() == b.y()) return a.x() < b.x();
+            return a.y() < b.y();
+        });
         foe(v, vertices) {
             foab(dy, -10, 5) foab(dx, -10, 5) { // TODO: probably don't need to check negative
                 Point p (floor_exact(v.x() + dx), floor_exact(v.y() + dy));
@@ -1128,6 +1198,103 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input) {
         }
 next_item:
         cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
+    }
+
+    return output;
+}
+*/
+
+PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
+    auto input = _input;
+    input.items = input.items.expand();
+    MIPPackingHelpers helper (NULL, NULL);
+    vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items);
+    input.items = permute(input.items, sorted_idxs);
+
+    // Compute parameters
+    auto get_average_area = [](ItemsContainer& items) -> FT {
+        FT sum = 0;
+        foe(item, items) sum += item.pol.area();
+        return sum / FT(sz(items));
+    };
+    FT max_number_of_items_in_square = 100;
+    assert(max_number_of_items_in_square >= 5);
+    // square_size * square_size / get_average_area(input.items) = max_number_of_items_in_square
+    // =>
+    // square_size = sqrt(max_number_of_items_in_square * get_average_area(input.items))
+    FT square_size = sqrt((max_number_of_items_in_square * get_average_area(input.items)).to_double()) - 2;
+    assert(square_size >= 10);
+
+    // Get grid dimensions
+    Point lowest = get_lowest_point(input.container);
+
+    auto tmp_container = input.container;
+    foe(p, tmp_container) p = Point(p.x(), p.y() * FT(-1));
+    Point highest = get_lowest_point(input.container);
+    highest = Point(highest.x(), highest.y() * -1);
+
+    foe(p, tmp_container) p = Point(p.y(), p.x());
+    Point leftmost = get_lowest_point(tmp_container);
+    leftmost = Point(leftmost.y(), leftmost.x());
+
+    foe(p, tmp_container) p = Point(p.x(), p.y() * FT(-1));
+    Point rightmost = get_lowest_point(input.container);
+    rightmost = Point(rightmost.x(), rightmost.y() * -1);
+    rightmost = Point(rightmost.y(), rightmost.x());
+
+    Point start (leftmost.x() - FT(2), lowest.y() - FT(2)); // -2 should not be necessary
+    debug(lowest, highest);
+    debug(leftmost, rightmost);
+    FT width = rightmost.x() - leftmost.x() + FT(4);
+    FT height = highest.y() - lowest.y() + FT(4);
+    FT number_of_steps_x = ceil_exact(width / square_size);
+    FT number_of_steps_y = ceil_exact(height / square_size);
+    assert(width >= 10);
+    assert(height >= 10);
+    assert(number_of_steps_x >= 1);
+    assert(number_of_steps_y >= 1);
+
+    // Generate containers
+    vector<Polygon> containers;
+    fon(_i, number_of_steps_x) {
+        fon(_j, number_of_steps_y) {
+            FT i = _i;
+            FT j = _j;
+            Polygon square;
+            {
+                square.push_back(Point(start.x() + i * square_size, start.y() + j * square_size));
+                square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + j * square_size));
+                square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + (j + FT(1)) * square_size));
+                square.push_back(Point(start.x() + i * square_size, start.y() + (j + FT(1)) * square_size));
+            }
+            Polygon_set allowed_space (get_complement(Polygon_set(input.container)));
+            allowed_space.intersection(Polygon_set(square));
+            if(allowed_space.is_empty()) continue;
+            assert(to_polygon_vector(allowed_space).size() == 1);
+            assert(to_polygon_vector(allowed_space)[0].number_of_holes() == 0);
+            containers.push_back(to_polygon_vector(allowed_space)[0].outer_boundary());
+        }
+    }
+
+    // Divide items into containers
+    vector<ItemsContainer> items_containers (sz(containers));
+    fon(i, sz(input.items)) {
+        auto& item = input.items[i];
+        assert(item.quantity == 1);
+        Item new_item {item.value, item.quantity, item.pol, i, Vector(0,0)};
+        items_containers[i % sz(items_containers)].add_item(new_item);
+    }
+    
+    // Solve each container
+    PackingOutput output (_input);
+    fon(i, sz(containers)) {
+        PackingInput container_input {containers[i], items_containers[i]};
+        PackingOutput toutput = HeuristicPackingNOMIP().run(input);
+        foe(item, toutput.items) {
+            assert(item.quantity == 1);
+            Item new_item {item.value, 1, item.pol, input.items[item.idx].idx, Vector(0,0)};
+            output.add_item(new_item);
+        }
     }
 
     return output;

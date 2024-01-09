@@ -68,3 +68,13 @@ public:
     PackingOutput run(PackingInput); 
 
 };
+
+class HeuristicPackingGrid {
+
+private:
+
+public:
+
+    PackingOutput run(PackingInput); 
+
+};

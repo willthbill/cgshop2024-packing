@@ -43,6 +43,9 @@ class InputConfiguration(Configuration):
     def get_number_of_items(self):
         return sum(self.quantities)
 
+    def get_number_of_vertices_on_container(self):
+        return len(self.container.points)
+
     def get_cpp_items(self):
         return [
             (self.values[i], self.quantities[i], self.items[i].get_approx_representation())

@@ -25,6 +25,7 @@ for name, filename, input_conf in read_instances(instance_files.split(";")):
 
     print(f"[py] Running algorithm on instance, {name} ({filename})")
     print(f"[py] Number of items: {input_conf.get_number_of_items()}")
+    print(f"[py] Number of vertices on container: {input_conf.get_number_of_vertices_on_container()}")
     print(f"[py] Max value: {input_conf.get_max_value()}")
     print(f"[py] Max x/y coord: {input_conf.get_max_xy()}")
     print(f"[py] Weak upper bound: {input_conf.get_weak_upper_bound()}")

@@ -11,6 +11,7 @@ PackingOutput optimal_algorithm(PackingInput input) {
     cout << "[c++] RUNNING OPTIMAL ALGORITHM" << endl;
     // return OptimalPackingFast().run(input);
     // return HeuristicPackingFast().run(input);
-    return HeuristicPackingNOMIP().run(input);
+    // return HeuristicPackingNOMIP().run(input);
+    return HeuristicPackingGrid().run(input);
 }
 
