@@ -17,22 +17,23 @@ def get_output_dir(run_id, name, filename):
     return dir
 
 
-def get_environment_variables():
-    should_write = "SHOULD_WRITE" in os.environ and os.environ["SHOULD_WRITE"] == "1"
+def get_environment_variables(env):
+    should_write = "SHOULD_WRITE" in env and env["SHOULD_WRITE"] == "1"
     description = ""
-    if "DESC" in os.environ: description = os.environ["DESC"]
+    if "DESC" in env: description = env["DESC"]
     if should_write: assert len(description) > 3
-    only_stats = "ONLY_STATS" in os.environ and os.environ["ONLY_STATS"] == "1"
+    only_stats = "ONLY_STATS" in env and env["ONLY_STATS"] == "1"
     if only_stats: should_write = False
-    run_id = os.environ["RUN_ID"] if "RUN_ID" in os.environ else generate_run_id()
+    run_id = env["RUN_ID"] if "RUN_ID" in env else generate_run_id()
     return should_write, description, only_stats, run_id
 
 
-def run_sequentially(instances):
+def run_sequentially(p):
+    instances = p[0]
+    env = p[1]
 
-    should_write, description, only_stats, run_id = get_environment_variables()
+    should_write, description, only_stats, run_id = get_environment_variables(env)
 
-    print("[py] Instance files:", instance_files)
     for name, filename, input_conf in instances:
 
         dir = get_output_dir(run_id, name, filename)
@@ -40,21 +41,22 @@ def run_sequentially(instances):
         if should_write:
             if not os.path.exists(dir):
                 os.makedirs(dir, exist_ok=False)
-            sys.stdout = StreamTee(f'{dir}/stdout.txt', sys.stdout)
-            sys.stderr = StreamTee(f'{dir}/stderr.txt', sys.stderr)
+            # sys.stdout = StreamTee(f'{dir}/stdout.txt', sys.stdout)
+            # sys.stderr = StreamTee(f'{dir}/stderr.txt', sys.stderr)
 
-        def print_information():
-            print(f"[py] Running algorithm on instance, {name} ({filename})")
-            print(f"[py] Description: {description}")
-            print(f"[py] Number of items: {input_conf.get_number_of_items()}")
-            print(f"[py] Number of vertices on container: {input_conf.get_number_of_vertices_on_container()}")
-            print(f"[py] Max value: {input_conf.get_max_value()}")
-            print(f"[py] Max x/y coord: {input_conf.get_max_xy()}")
-            print(f"[py] Weak upper bound: {input_conf.get_weak_upper_bound()}")
-            print(f"[py] Strong upper bound: {input_conf.get_strong_upper_bound()}")
-            print(f"[py] Max number of placed items (upper bound): {input_conf.get_max_number_of_placed_items()}")
+        def get_information():
+            s = f"[py] Running algorithm on instance, {name} ({filename})\n"
+            s += f"[py] Description: {description}\n"
+            s += f"[py] Number of items: {input_conf.get_number_of_items()}\n"
+            s += f"[py] Number of vertices on container: {input_conf.get_number_of_vertices_on_container()}\n"
+            s += f"[py] Max value: {input_conf.get_max_value()}\n"
+            s += f"[py] Max x/y coord: {input_conf.get_max_xy()}\n"
+            s += f"[py] Weak upper bound: {input_conf.get_weak_upper_bound()}\n"
+            s += f"[py] Strong upper bound: {input_conf.get_strong_upper_bound()}\n"
+            s += f"[py] Max number of placed items (upper bound): {input_conf.get_max_number_of_placed_items()}"
+            return s
 
-        print_information()
+        print(get_information())
 
         if only_stats:
             print()
@@ -65,40 +67,41 @@ def run_sequentially(instances):
         end_time = time.time()
         time_taken = end_time - start_time
 
-        print_information()
-        print(f"[py] Function execution time: {time_taken} seconds")
-        print(f"[py] Score: {output_conf.get_score()}")
-        print(f"[py] Finished on instance, {name} ({filename})")
+        info = get_information() + "\n"
+        info += f"[py] Function execution time: {time_taken} seconds\n"
+        info += f"[py] Score: {output_conf.get_score()}\n"
+        info += f"[py] Finished on instance, {name} ({filename})\n"
 
         if should_write:
-            print(f"[py] Writing output to {dir}")
+            info += f"[py] Writing output to {dir}\n"
+            print(info)
             visualize(output_conf, show=False, out_file=f"{dir}/visualization.pdf", preserve_coords=True)
-            write_output(dir, name, filename, run_id, output_conf)
+            write_output(dir, name, filename, run_id, output_conf, info)
         else:
-            # visualize(output_conf, show=True, preserve_coords=True)
-            pass
+            print(info)
+            visualize(output_conf, show=True, preserve_coords=True)
         print("===========================\n")
 
-
-def run_command(p):
-    command = p[0]
-    env = p[1]
-    write_to = p[2]
-    output_stderr = ""
-    try:
-        # output_stderr = subprocess.run(command, shell=True, check=False, env=env, stderr=subprocess.PIPE, text=True).stderr
-        subprocess.run(command, shell=True, check=False, env=env)
-    except subprocess.CalledProcessError as e:
-        print(f"An error occurred: {e}")
-    # print(output_stderr, file=sys.stderr)
-    # if write_to is not None:
-    #     assert not os.path.exists(write_to)
-    #     with open(write_to, 'w') as f:
-    #         f.write(output_stderr)
-    print(f"Finished running {command}")
+# def run_command(p):
+#     command = p[0]
+#     env = p[1]
+#     write_to = p[2]
+#     output_stderr = ""
+#     try:
+#         # output_stderr = subprocess.run(command, shell=True, check=False, env=env, stderr=subprocess.PIPE, text=True).stderr
+#         subprocess.run(command, shell=True, check=False, env=env)
+#     except subprocess.CalledProcessError as e:
+#         print(f"An error occurred: {e}")
+#     # print(output_stderr, file=sys.stderr)
+#     # if write_to is not None:
+#     #     assert not os.path.exists(write_to)
+#     #     with open(write_to, 'w') as f:
+#     #         f.write(output_stderr)
+#     print(f"Finished running {command}")
 
 
 instance_files = os.environ["INSTANCE_FILES"]
+print("[py] Instance files:", instance_files)
 instances = read_instances(instance_files.split(";"))
 in_parallel = "RUN_ID" not in os.environ
 if in_parallel:
@@ -108,27 +111,48 @@ if in_parallel:
 
     print(f"[py-manager] RUNNING IN PARALLEL WITH MAX_THREADS={max_threads}")
 
-    should_write, description, only_stats, run_id = get_environment_variables()
+    should_write, description, only_stats, run_id = get_environment_variables(os.environ)
 
-    commands = []
+    inputs = []
     for name, filename, input_conf in instances:
         env = os.environ.copy()
         env['INSTANCE_FILES'] = filename
         env['RUN_ID'] = run_id
         del env['MAX_THREADS']
-        dir = get_output_dir(run_id, name, filename)
-        if should_write:
-            if not os.path.exists(dir):
-                os.makedirs(dir, exist_ok=False)
-        commands.append((
-            "time -v ./bin/runpythonfile main.py",
-            env,
-            os.path.join(dir, "mem.txt") if should_write else None
+        inputs.append((
+            [(name, filename, input_conf)],
+            env
         ))
+    
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
-        executor.map(run_command, commands)
+        executor.map(run_sequentially, inputs)
+    # with Pool(max_threads) as pool:
+    #     pool.map(run_sequentially, inputs)
+    # pool = Pool(processes=max_threads)
+    # pool.map(run_sequentially, inputs)
+    # pool.close()
+    # pool.join()
+
+    # commands = []
+    # for name, filename, input_conf in instances:
+    #     env = os.environ.copy()
+    #     env['INSTANCE_FILES'] = filename
+    #     env['RUN_ID'] = run_id
+    #     del env['MAX_THREADS']
+    #     dir = get_output_dir(run_id, name, filename)
+    #     if should_write:
+    #         if not os.path.exists(dir):
+    #             os.makedirs(dir, exist_ok=False)
+    #     commands.append((
+    #         "time -v ./bin/runpythonfile main.py",
+    #         env,
+    #         os.path.join(dir, "mem.txt") if should_write else None
+    #     ))
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
+    #     executor.map(run_command, commands)
     # with Pool(max_threads) as pool:
     #     pool.map(run_command, commands)
-else:
-    print("[py-manager] RUNNING IN SEQUENCE")
-    run_sequentially(instances)
+# else:
+#     print("[py-manager] RUNNING IN SEQUENCE")
+#     run_sequentially(instances, os.environ)

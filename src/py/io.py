@@ -100,7 +100,7 @@ def get_output_directory_for_instance(name, input_filename):
     return filename
 
 
-def write_output(dir, name, input_filename, run_id, output_conf):
+def write_output(dir, name, input_filename, run_id, output_conf, stdout):
     # Ensure the directory exists
     assert os.path.exists(dir)
 
@@ -139,6 +139,11 @@ def write_output(dir, name, input_filename, run_id, output_conf):
     with open(env_filename, 'w') as f:
         for key, value in os.environ.items():
             f.write(f'{key}: {value}\n')
+
+    stdout_file = os.path.join(dir, "stdout.txt")
+    assert not os.path.exists(stdout_file)
+    with open(stdout_file, 'w') as f:
+        f.write(stdout)
 
 
 class StreamTee(object):
