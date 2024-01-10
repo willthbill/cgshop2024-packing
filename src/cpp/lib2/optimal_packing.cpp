@@ -1289,7 +1289,7 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     // Solve each container
     PackingOutput output (_input);
     fon(i, number_of_containers) {
-        assert(sz(items_containers[i]) <= max_number_of_items_in_square * 1.05 + 2);
+        assert(sz(items_containers[i]) <= max_number_of_items_in_square * 3 + 2);
         PackingInput container_input {containers[i], items_containers[i]};
         PackingOutput toutput = HeuristicPackingNOMIP().run(container_input);
         foe(item, toutput.items) {

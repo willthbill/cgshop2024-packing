@@ -1,3 +1,4 @@
+#!/bin/bash
 file=$1
 shift
 PYTHONPATH="./out/build:$PYTHONPATH" python3 src/$file $@

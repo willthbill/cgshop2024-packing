@@ -65,8 +65,8 @@ def visualize(conf, show=True, out_file=None, preserve_coords=False):
     ax.axis("equal")
     ax.autoscale()
     fig.tight_layout()
-    if show: 
-        print("rendering")
+    if show:
+        print("[py] rendering")
         plt.show()
     if out_file is not None:
         plt.savefig(out_file, dpi=300)

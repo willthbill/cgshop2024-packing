@@ -19,20 +19,21 @@ def get_output_dir(run_id, name, filename):
 
 def get_environment_variables(env):
     should_write = "SHOULD_WRITE" in env and env["SHOULD_WRITE"] == "1"
+    should_visualize = "VISUALIZE" in env and env["VISUALIZE"] == "1"
     description = ""
     if "DESC" in env: description = env["DESC"]
     if should_write: assert len(description) > 3
     only_stats = "ONLY_STATS" in env and env["ONLY_STATS"] == "1"
     if only_stats: should_write = False
     run_id = env["RUN_ID"] if "RUN_ID" in env else generate_run_id()
-    return should_write, description, only_stats, run_id
+    return should_write, description, only_stats, run_id, should_visualize
 
 
 def run_sequentially(p):
     instances = p[0]
     env = p[1]
 
-    should_write, description, only_stats, run_id = get_environment_variables(env)
+    should_write, description, only_stats, run_id, should_visualize = get_environment_variables(env)
 
     for name, filename, input_conf in instances:
 
@@ -75,33 +76,34 @@ def run_sequentially(p):
         if should_write:
             info += f"[py] Writing output to {dir}\n"
             print(info)
-            visualize(output_conf, show=False, out_file=f"{dir}/visualization.pdf", preserve_coords=True)
+            if should_visualize: visualize(output_conf, show=False, out_file=f"{dir}/visualization.pdf", preserve_coords=True)
             write_output(dir, name, filename, run_id, output_conf, info)
         else:
             print(info)
-            visualize(output_conf, show=True, preserve_coords=True)
+            if should_visualize: visualize(output_conf, show=True, preserve_coords=True)
         print("===========================\n")
 
 def run_command(p):
     command = p[0]
     env = p[1]
-    write_to = p[2]
-    output_stderr = ""
+    #write_to = p[2]
+    #output_stderr = ""
+    print(command)
     try:
-        output_stderr = subprocess.run(command, shell=True, check=False, env=env, stderr=subprocess.PIPE, text=True).stderr
-        # subprocess.run(command, shell=True, check=False, env=env)
+        # output_stderr = subprocess.run(command, shell=False, check=False, env=env, stderr=subprocess.PIPE, text=True).stderr
+        subprocess.run(command, shell=False, check=False, env=env)
     except subprocess.CalledProcessError as e:
         print(f"An error occurred: {e}")
-    print(output_stderr, file=sys.stderr)
-    if write_to is not None:
-        assert not os.path.exists(write_to)
-        with open(write_to, 'w') as f:
-            f.write(output_stderr)
-    print(f"Finished running {command}")
+    # print(output_stderr, file=sys.stderr)
+    # if write_to is not None:
+    #     assert not os.path.exists(write_to)
+    #     with open(write_to, 'w') as f:
+    #         f.write(output_stderr)
+    print(f"[py-manager] Finished running {command}")
 
 
 instance_files = os.environ["INSTANCE_FILES"]
-print("[py] Instance files:", instance_files)
+print("[py-manager] Instance files:", instance_files)
 instances = read_instances(instance_files.split(";"))
 in_parallel = "RUN_ID" not in os.environ
 if in_parallel:
@@ -111,7 +113,7 @@ if in_parallel:
 
     print(f"[py-manager] RUNNING IN PARALLEL WITH MAX_THREADS={max_threads}")
 
-    should_write, description, only_stats, run_id = get_environment_variables(os.environ)
+    should_write, description, only_stats, run_id, should_visualize = get_environment_variables(os.environ)
 
     # inputs = []
     # for name, filename, input_conf in instances:
@@ -140,19 +142,22 @@ if in_parallel:
         env['INSTANCE_FILES'] = filename
         env['RUN_ID'] = run_id
         del env['MAX_THREADS']
+        env["PYTHONPATH"] = ("./out/build:" + env["PYTHONPATH"]) if "PYTHONPATH" in env else "./out/build"
         dir = get_output_dir(run_id, name, filename)
         if should_write:
             if not os.path.exists(dir):
                 os.makedirs(dir, exist_ok=False)
         commands.append((
-            "./bin/runpythonfile main.py",
+            # ["./bin/runpythonfile", "main.py"],
+            ["python3", "src/main.py"],
             env,
             os.path.join(dir, "mem.txt") if should_write else None
         ))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
-        executor.map(run_command, commands)
-    # with Pool(max_threads) as pool:
-    #     pool.map(run_command, commands)
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
+    #    executor.map(run_command, commands)
+    with Pool(max_threads) as pool:
+        pool.map(run_command, commands)
+    print("[py manager] FINISHED ALL INSTANCES")
 else:
-    print("[py-manager] RUNNING IN SEQUENCE")
+    print("[py] RUNNING IN SEQUENCE")
     run_sequentially((instances, os.environ))
