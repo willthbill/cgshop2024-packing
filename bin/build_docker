@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "remember to set user id"
+read
+
 source env.list
 #--build-arg GITHUB_AUTH="${GITHUB_AUTH}" \
 

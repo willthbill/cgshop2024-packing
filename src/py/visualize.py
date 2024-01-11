@@ -6,7 +6,10 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from py import io
 
-mpl.use('TkAgg')
+try:
+    mpl.use('TkAgg')
+except Exception as e:
+    pass
 
 def append_items_arrange(patches, items, container):
     x_start = 1.5*max([p[0] for p in container])

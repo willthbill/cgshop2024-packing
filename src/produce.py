@@ -12,7 +12,9 @@ def find_solution_json_files(directory):
     return matches
 
 
-solution_files = find_solution_json_files("output")
+match_input_path=os.environ["MATCH_INPUT_PATH"] if "MATCH_INPUT_PATH" in os.environ else "input/cg24"
+match_output_path=os.environ["MATCH_OUTPUT_PATH"] if "MATCH_OUTPUT_PATH" in os.environ else "output/runs"
+solution_files = find_solution_json_files("output/runs")
 print(len(solution_files), "solutions found\n")
 
 names = {}
@@ -24,9 +26,21 @@ for file in solution_files:
         names[name] = []
     names[name].append((metadata))
 
+_names = list(names.keys())
+for name in _names:
+    if not any(match_input_path in e["input_filename"] for e in names[name]):
+        del names[name]
+
 best_filenames = []
+average_rel_worst = 0
+average_rel_strong = 0
+cnt = 0
 for name in names:
     names[name].sort(key=lambda x: x["score"], reverse=True)
+    worst = names[name][-1]["score"]
+    names[name] = list(filter(lambda x: match_output_path in x["output_filename"], names[name]))
+    if len(names[name]) == 0:
+        continue
     scores = [d["score"] for d in names[name]]
     best = names[name][0]
     weak = best["weak_upper_bound"]
@@ -36,9 +50,21 @@ for name in names:
     assert all(s <= strong <= weak for s in scores)
     print(f"{name}")
     print(f"   {weak} >= {strong} >= {scores}")
-    print(f"   relative to strong: {scores[0] / strong}")
+    rel_strong = scores[0] / strong
+    rel_worst = scores[0] / worst
+    average_rel_strong += rel_strong
+    average_rel_worst += rel_worst
+    cnt += 1
+    print(f"   relative to strong: {rel_strong}")
+    print(f"   relative to worst: {rel_worst}")
     print(f"   best: {best['output_dir']}")
     best_filenames.append(best["output_filename"])
+
+average_rel_strong /= cnt
+average_rel_worst /= cnt
+
+print(f"\nAverage relative to strong: {average_rel_strong}")
+print(f"Average relative to worst: {average_rel_worst}")
 
 submission_filename = "submission.zip"
 with zipfile.ZipFile(submission_filename, 'w') as zipf:

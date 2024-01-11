@@ -22,8 +22,8 @@ RUN pacman -Syu --noconfirm time
 #RUN ./scripts/build
 #WORKDIR /app
 
-RUN groupadd -g 1000 mygroup && \
-    useradd -m -u 1000 -g 1000 -s /bin/bash myuser
+RUN groupadd -g 1031 mygroup && \
+    useradd -m -u 1031 -g 1031 -s /bin/bash myuser
 RUN usermod -aG wheel myuser
 RUN sed -i 's/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers
 RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers

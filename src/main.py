@@ -77,7 +77,7 @@ def run_sequentially(p):
             info += f"[py] Writing output to {dir}\n"
             print(info)
             if should_visualize: visualize(output_conf, show=False, out_file=f"{dir}/visualization.pdf", preserve_coords=True)
-            write_output(dir, name, filename, run_id, output_conf, info)
+            write_output(dir, name, filename, run_id, output_conf, info, description)
         else:
             print(info)
             if should_visualize: visualize(output_conf, show=True, preserve_coords=True)

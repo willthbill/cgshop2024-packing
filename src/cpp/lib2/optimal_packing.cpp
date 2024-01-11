@@ -1217,7 +1217,7 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
         foe(item, items) sum += item.pol.area();
         return sum / FT(sz(items));
     };
-    FT max_number_of_items_in_square = 30;
+    FT max_number_of_items_in_square = 200; // this time 2
     assert(max_number_of_items_in_square >= 5);
     // square_size * square_size / get_average_area(input.items) = max_number_of_items_in_square
     // =>
@@ -1289,7 +1289,8 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     // Solve each container
     PackingOutput output (_input);
     fon(i, number_of_containers) {
-        assert(sz(items_containers[i]) <= max_number_of_items_in_square * 3 + 2);
+        while(sz(items_containers[i]) > max_number_of_items_in_square * 2) items_containers[i].pop_item();
+        assert(sz(items_containers[i]) <= max_number_of_items_in_square * 2);
         PackingInput container_input {containers[i], items_containers[i]};
         PackingOutput toutput = HeuristicPackingNOMIP().run(container_input);
         foe(item, toutput.items) {

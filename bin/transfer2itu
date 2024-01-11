@@ -1,6 +1,8 @@
+#!/bin/bash
+
 rsync -e 'ssh -p 8022 -i ~/.ssh/id_ed25519_important_only_itu_server' -ru \
+    -vv --stats --progress \
     CMakeLists.txt \
-    .bash_history \
     .bashrc \
     .envrc \
     Dockerfile \
@@ -8,8 +10,14 @@ rsync -e 'ssh -p 8022 -i ~/.ssh/id_ed25519_important_only_itu_server' -ru \
     bin \
     input \
     src \
+    licenses \
     cgshop23@preciousss.itu.dk:/mnt/large_storage/cgshop23/max-polygon-packing-server
 
+echo "Done with this repo"
+
 rsync -e 'ssh -p 8022 -i ~/.ssh/id_ed25519_important_only_itu_server' -ru \
+    -vv --stats --progress \
     ../cgshop-lib/CMakeLists.txt  ../cgshop-lib/lib  ../cgshop-lib/scripts \
     cgshop23@preciousss.itu.dk:/mnt/large_storage/cgshop23/cgshop-lib
+
+echo "Done with lib"

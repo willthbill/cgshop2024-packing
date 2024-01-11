@@ -67,6 +67,9 @@ ItemsContainer ItemsContainer::expand() {
     }
     return res;
 }
+void ItemsContainer::pop_item() {
+    items.pop_back();
+}
 int ItemsContainer::size() {
     return sz(items);
 }

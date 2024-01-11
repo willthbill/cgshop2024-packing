@@ -35,6 +35,8 @@ public:
     auto end() { return items.end(); }
     auto begin() const { return items.begin(); }
     auto end() const { return items.end(); }
+
+    void pop_item();
 };
 
 struct PackingInput {

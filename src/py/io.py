@@ -110,13 +110,14 @@ def get_output_directory_for_instance(name, input_filename):
     return filename
 
 
-def write_output(dir, name, input_filename, run_id, output_conf, stdout):
+def write_output(dir, name, input_filename, run_id, output_conf, stdout, description):
     # Ensure the directory exists
     assert os.path.exists(dir)
 
     output_filename = os.path.join(dir, 'solution.json')
     metadata = {
         'name': name,
+        'description': description,
         'input_filename': input_filename,
         'output_dir': dir,
         'output_filename': output_filename,

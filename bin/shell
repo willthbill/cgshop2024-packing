@@ -5,7 +5,7 @@ source env.list
 xhost +local:docker
 
 # first arg is for gdb
-docker run \
+container_id=$(docker run \
     --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
     -v .:/app/max-polygon-packing \
     -v "$CGSHOP_LIB_PATH_HOST":/app/cgshop-lib \
@@ -13,5 +13,6 @@ docker run \
     -v ./.bash_history:/home/myuser/.bash_history \
     --ulimit nofile=1024:10240 \
     --env-file ./env.list \
-    -it max-polygon-packing
+    -d -it max-polygon-packing)
 
+docker exec -it $container_id /bin/bash
