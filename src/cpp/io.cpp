@@ -179,3 +179,19 @@ FT PackingOutput::get_score() {
 int PackingOutput::size() {
     return sz(items);
 }
+
+
+pair<PackingInput,map<int,int>> PackingOutput::get_equiv_input() {
+    auto t = items;
+    map<int,int> mp;
+    int idx = 0;
+    foe(item, t) {
+        mp[idx] = item.idx;
+        item.idx = idx;
+        idx++;
+    }
+    return make_pair(PackingInput {
+        input.container,
+        t
+    }, mp);
+}

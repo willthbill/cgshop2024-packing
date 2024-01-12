@@ -291,6 +291,13 @@ public:
         });*/
         return idxs;
     }
+    vector<int> sort_by_area(ItemsContainer items) {
+        vector<int> idxs (sz(items)); iota(idxs.begin(), idxs.end(), 0);
+        sort(idxs.begin(), idxs.end(), [&](int a, int b) {
+            return items[a].pol.area() > items[b].pol.area();
+        });
+        return idxs;
+    }
     pair<vector<MIPVariable>, vector<MIPConstraint>> get_iteminitem_constraints(
         pair<MIPVariable, MIPVariable>& p1,
         pair<MIPVariable, MIPVariable>& p2,
@@ -1035,15 +1042,21 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
     return output;
 }
 
-PackingOutput HeuristicPackingNOMIP::run(PackingInput _input) {
+PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print = true, int sort_type = 0) {
     auto input = _input;
 
     cout << "[c++] Expanding items" << endl;
     input.items = input.items.expand();
 
-    cout << "[c++] Sorting items" << endl;
     MIPPackingHelpers helper (NULL, NULL);
-    vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items); // TODO: does this even sort non-increasingly?
+    vector<int> sorted_idxs;
+    if(sort_type == 0) {
+        cout << "[c++] Sorting items by value/area" << endl;
+        helper.sort_by_value_over_area(input.items); // TODO: does this even sort non-increasingly?
+    } else if(sort_type == 1) {
+        cout << "[c++] Sorting items by area" << endl;
+        helper.sort_by_area(input.items); // TODO: does this even sort non-increasingly?
+    }
     input.items = permute(input.items, sorted_idxs);
 
     PackingOutput output (_input);
@@ -1100,6 +1113,26 @@ next_item:
         cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
     }
 
+    return output;
+}
+
+PackingOutput HeuristicPackingGreedyResort::run(PackingInput input) {
+    PackingOutput best_output;
+    FT score = 0;
+    cout << "[c++] Running heuristic packing " << endl;
+    while(true) {
+        output = HeuristicPackingNOMIP::run(input);
+        auto tmp_input = outout.get_equiv_input();
+        output = HeuristicPackingNOMIP::run(tmp_input.fi);
+        FT s = output.get_score();
+        if(s > score) {
+            cout << "[c++] Improvement: " << (s - score).to_double() << endl;
+            score = s;
+            best_output = output;
+        } else {
+            break;
+        }
+    }
     return output;
 }
 
@@ -1342,3 +1375,49 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
 
     return output;
 }
+
+/*
+*/
+
+/*PLAN
+1. Reuse items usin OST
+2. Recursive algorithm
+- recursive algorithm
+- splitting is done using grid. randomly shifted (fixed seed)
+    - or the grid could be moved predictively in each recursive call, but with the guarantee that it is the same shift as the parent
+    - thus splitting is based on area
+- after solving a hole we do (if it is not too big), we resolve it but sorted in order of area (but keep the solution in case it is worsened with sorting by area). this creates holes. we repeat a certain number of times
+- right now we just give a hole access to all items and they pick a fair distribution of them less than their area
+    - so they need to be sorted by area
+3. repacking
+    - simply repack a space. just remove the items in that space and run the recursive algorithm with all items (the removed and the additional not placed)
+        - or potentially repack and then fill holes with items that are not in the space (extra items)
+4. Improvements to discuss
+    - Consider better splitting (ex. random lines, split across the longest dimension)
+        - Only split when complexity is too high, not just area
+    - Solve by moving towards a common point (to make holes go in the same direction)
+    - Consider more advanced forms of repacking (ex. moving all holes to a common place)
+    - Using MIP (ex. for repacking)
+        - MIP improvements
+            - Warmstart on existing packing
+            - Dynamic parameters
+                - higher mip gap in the beginning
+            = bounding box trick
+            - use separator lines to simplify iteminitem constraints. Supportvectormachine?
+            - gurobi parameters?
+            - try to use the fast integer approximation algorithm where we also add 2,3 or something like that in the correct direction
+            - allow some pieces to move around and others to be part of the big piece. for example most recent pieces can move
+            - there are some unnecessary variables/constraints:
+                - in iteminitem and inside container constraints we don't need to condition it on in_use_binaries, since we have the extra constraint that the sum of the helper binaries should be at least one.??
+                - in inside pset basically the same thing???
+    - Sample more items for smaller holes since there can never be a lot of items placed inside
+    - Value / convex hull?
+    - Use long vertical rectangles to move items down in the packing?
+    - Using density
+    - Reduce number of holes by running a unit square (or bigger/smaller) around items using minkowski sum
+    - Fractional knapsack as estimate for something?
+    - Make the holes overlap (ex. square grid overlap)
+    - Make repacking spaces overlap
+    - Somehow remove already packed items and replace with not packed items
+    - Repack around holes
+*/

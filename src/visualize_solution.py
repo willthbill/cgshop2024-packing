@@ -37,4 +37,4 @@ output_conf = OutputConfiguration(
     input_conf
 )
 
-visualize(output_conf, show=True, preserve_coords=True)
+visualize(output_conf, show=True, preserve_coords=True, out_file="solvis.pdf")

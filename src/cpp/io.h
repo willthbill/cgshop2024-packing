@@ -80,4 +80,6 @@ public:
     auto begin() const { return items.begin(); }
     auto end() const { return items.end(); }
 
+    std::pair<PackingInput,std::map<int,int>> get_equiv_input();
+
 };

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+transferfromitu solvis.pdf solvis.pdf
+okular solvis.pdf

@@ -1,3 +1,4 @@
+import os
 import glob
 import math
 from matplotlib.patches import Polygon
@@ -56,7 +57,7 @@ def visualize(conf, show=True, out_file=None, preserve_coords=False):
     if preserve_coords: append_items(patches, items)
     else: append_items_arrange(patches, items, container)
 
-    patch_collection = PatchCollection(patches, cmap=cmap, norm=norm, ec="black")#, lw=.002)
+    patch_collection = PatchCollection(patches, cmap=cmap, norm=norm, ec="black", lw=.002)#, lw=.002)
     if min_value < max_value:
         patch_collection.set_array(conf.values)
         patch_collection.set_clim([min_value, max_value])
@@ -72,15 +73,18 @@ def visualize(conf, show=True, out_file=None, preserve_coords=False):
         print("[py] rendering")
         plt.show()
     if out_file is not None:
-        plt.savefig(out_file, dpi=300)
+        plt.savefig(out_file, dpi=1000)
     plt.close()
 
-def visualize_instances_dir(directory, sort=None):
+def visualize_instances_dir(directory, sort=None, outdir=None):
     filenames = glob.glob(directory + "/*.json")
     for filename in filenames:
-        visualize_instance_file(filename, sort)
+        visualize_instance_file(filename, sort, outdir)
 
-def visualize_instance_file(filename, sort=None):
+def visualize_instance_file(filename, sort=None, outdir=None):
     name, filename, conf = io.read_instance(filename, sort, expand=True)
     print(name, filename)
-    visualize(conf, show=True)
+    if outdir is None:
+        visualize(conf, show=True)
+    else:
+        visualize(conf, show=False, out_file=os.path.join(outdir, name + ".pdf"))
