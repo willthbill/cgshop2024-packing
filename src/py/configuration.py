@@ -110,12 +110,19 @@ class OutputConfiguration(Configuration):
         super().__init__(input_conf.container, items, values)
         self.translations = []
         for t in translations:
-            assert t[0][-2:] == "/1"
-            assert t[1][-2:] == "/1"
-            self.translations.append((
-                int(t[0][:-2]),
-                int(t[1][:-2])
-            ))
+            a = None
+            b = None
+            if type(t[0]) is str and "/" in t[0]:
+                assert t[0][-2:] == "/1"
+                a = int(t[0][:-2])
+            else:
+                a = int(t[0])
+            if type(t[1]) is str and "/" in t[1]:
+                assert t[1][-2:] == "/1"
+                b = int(t[1][:-2])
+            else:
+                b = int(t[1])
+            self.translations.append((a, b))
         self.indices = indices
         self.input_conf = input_conf
 

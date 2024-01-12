@@ -12,4 +12,3 @@ def run_algorithm(input_conf : InputConfiguration):
         [Polygon(e[2]) for e in out],
         input_conf
     )
-

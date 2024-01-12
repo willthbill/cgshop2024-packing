@@ -1204,6 +1204,46 @@ next_item:
 }
 */
 
+class HeuristicPackingHelpers {
+    FT get_average_area(ItemsContainer& items) {
+        FT sum = 0;
+        foe(item, items) sum += item.pol.area();
+        return sum / FT(sz(items));
+    }
+
+    FT get_width(Polygon& pol) {
+        auto bbox = get_bounding_box(pol);
+        return bbox[2].x() - bbox[0].x();
+    }
+
+    FT get_height(Polygon& pol) {
+        auto bbox = get_bounding_box(pol);
+        return bbox[2].y() - bbox[0].y();
+    }
+
+    vector<Polygon> generate_grid() {
+        fon(_i, number_of_steps_x) {
+            fon(_j, number_of_steps_y) {
+                FT i = _i;
+                FT j = _j;
+                Polygon square;
+                {
+                    square.push_back(Point(start.x() + i * square_size, start.y() + j * square_size));
+                    square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + j * square_size));
+                    square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + (j + FT(1)) * square_size));
+                    square.push_back(Point(start.x() + i * square_size, start.y() + (j + FT(1)) * square_size));
+                }
+                Polygon_set allowed_space (Polygon_set(input.container));
+                allowed_space.intersection(Polygon_set(square));
+                if(allowed_space.is_empty()) continue;
+                assert(to_polygon_vector(allowed_space).size() == 1);
+                assert(to_polygon_vector(allowed_space)[0].number_of_holes() == 0);
+                containers.push_back(to_polygon_vector(allowed_space)[0].outer_boundary());
+            }
+        }
+    }
+};
+
 PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     auto input = _input;
     input.items = input.items.expand();
