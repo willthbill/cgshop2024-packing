@@ -1217,7 +1217,7 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
         foe(item, items) sum += item.pol.area();
         return sum / FT(sz(items));
     };
-    FT max_number_of_items_in_square = 200; // this time 2
+    FT max_number_of_items_in_square = 500; // this time 2
     assert(max_number_of_items_in_square >= 5);
     // square_size * square_size / get_average_area(input.items) = max_number_of_items_in_square
     // =>
