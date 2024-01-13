@@ -47,6 +47,8 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorith
     vector<pii> _container,
     vector<tuple<int,int,vector<pii>>> _items
 ) {
+    srand(42);
+
     cout << std::fixed;
     cerr << std::fixed;
 

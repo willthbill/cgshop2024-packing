@@ -38,3 +38,4 @@
 
 - how do we find the lowest integral coordinate (for the NOMIP solution)?
 - why does the NOMIP solution give different on jigsaw_cf3_xcd14250_28 that MIP based?
+

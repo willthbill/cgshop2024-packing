@@ -65,7 +65,7 @@ private:
 
 public:
 
-    PackingOutput run(PackingInput); 
+    PackingOutput run(PackingInput _input, bool print = true, int sort_type = 0);
 
 };
 
@@ -76,5 +76,17 @@ private:
 public:
 
     PackingOutput run(PackingInput); 
+
+};
+
+class HeuristicPackingRecursive {
+
+private:
+
+public:
+
+    PackingOutput run(PackingInput); 
+
+    PackingOutput solve(PackingInput); 
 
 };
