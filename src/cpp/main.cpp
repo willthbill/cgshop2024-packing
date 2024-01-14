@@ -10,6 +10,7 @@
 #include "lib/util/debug.h"
 
 #include "lib2/optimal_packing.h"
+#include "lib2/heuristic_packing.h"
 
 namespace py = pybind11;
 

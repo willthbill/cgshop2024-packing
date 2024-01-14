@@ -6,8 +6,8 @@
 #include "lib2/mip/gurobi.h"
 #include "io.h"
 
-
-class HeuristicPackingMIP {
+// CHECK OLD COMMIT FOR THIS IMPLEMENTATION hash: 2b34aec48ebac679f796c25bcf04b49a3cf3231e
+/*class HeuristicPackingMIP {
 
 private:
 
@@ -15,7 +15,7 @@ public:
 
     PackingOutput run(PackingInput); 
 
-};
+};*/
 
 class HeuristicPackingNOMIP {
 
