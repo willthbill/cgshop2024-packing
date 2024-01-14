@@ -328,7 +328,7 @@ pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(in
         auto [value_over_area, item_idx] = *available_items.find_by_order(idx);
         erase_item(item_idx);
         auto& item = items[item_idx];
-        indices.push_back(item.idx);
+        indices.push_back(item_idx);
         assert(item.quantity == 1);
         Item new_item {item.value, item.quantity, item.pol, sz(res), Vector(0,0)};
         res.add_item(new_item);
@@ -346,13 +346,16 @@ const int MAX_ITEMS_IN_PACKING = 200;
 PackingOutput HeuristicPackingRecursive::run(PackingInput _input) {
     auto input = _input;
     input.items = input.items.expand();
+    fon(i, sz(input.items)) input.items[i].idx = i;
     vector<int> item_indices;
     fon(i, sz(input.items)) {
         item_indices.push_back(input.items[i].idx);
     }
     AdvancedItemsContainer items (input.items);
     PackingOutput toutput (input);
+    cout << "[c++] Recursive algorithm starting" << endl;
     solve(input.container, items, toutput, 0);
+    cout << "[c++] Recursive algorithm finished" << endl;
     PackingOutput output (_input);
     foe(item, toutput.items) {
         Item new_item {item.value, 1, item.pol, item_indices[item.idx], Vector(0,0)};
@@ -386,7 +389,9 @@ void HeuristicPackingRecursive::solve(
         // TODO: only consider items that fit when computing avg_area i guess, when sampling is updated to only include items with small enough area
         auto [sampled_items, indices] = items.extract_items_random(min(sz(items), MAX_ITEMS_IN_PACKING)); // , container.area()
         PackingInput tinput {container, sampled_items};
+        debug("yo1");
         PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false);
+        debug("yo2");
         set<int> unused_indices;
         if(sz(toutput.items)) {
             FT prev_score = output.get_score();
