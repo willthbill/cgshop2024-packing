@@ -85,27 +85,6 @@ bool does_segment_cut(Polygon& p, Segment s) {
     return t.is_empty();*/
 }
 
-bool is_completely_inside(Polygon_set a, Polygon_set b) {
-    Polygon_set t; t.difference(b,a);
-    return t.is_empty();
-}
-bool is_completely_outside(Polygon_set a, Polygon_set b) {
-    return is_completely_inside(get_complement(a), b);
-}
-bool is_completely_inside(Polygon a, Polygon b) {
-    /*Polygon_set intersection; intersection.intersection(
-        to_polygon_set(a),
-        to_polygon_set(b)
-    );
-    auto arr = to_polygon_vector(intersection);
-    FT res = 0;
-    foe(p, arr) res += p.outer_boundary().area();
-    return res == b.area();*/
-    return is_completely_inside(Polygon_set(a), Polygon_set(b));
-}
-bool is_completely_inside(Polygon_with_holes a, Polygon_with_holes b) {
-    return is_completely_inside(Polygon_set(a), Polygon_set(b));
-}
 Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
     // Rounding method
     {

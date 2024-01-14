@@ -7,6 +7,7 @@ typedef PS::Stop_above_cost_threshold        Stop;
 typedef PS::Squared_distance_cost            Cost;
 
 #include "lib2/simplification.h"
+#include "lib2/util.h"
 #include "lib/util/cgal.h"
 #include "lib/util/geometry_utils.h"
 #include "lib/util/common.h"
@@ -23,11 +24,6 @@ int get_number_of_vertices(Polygon_set pset) {
         }
     }
     return res;
-}
-
-bool is_completely_inside(Polygon_set a, Polygon_set b) {
-    Polygon_set t; t.difference(b,a);
-    return t.is_empty();
 }
 
 Polygon_set SimplifyExpand::run(Polygon_set& pset, FT scale) {

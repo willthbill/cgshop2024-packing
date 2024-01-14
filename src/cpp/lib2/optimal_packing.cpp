@@ -18,32 +18,6 @@
 
 using namespace std;
 
-int get_number_of_vertices(Polygon_set pset) {
-    int res = 0;
-    foe(pwh, to_polygon_vector(pset)) {
-        res += pwh.outer_boundary().size();
-        foe(hole, pwh.holes()) {
-            res += hole.size();
-        }
-    }
-    return res;
-}
-vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
-    vector<Polygon_with_holes> pols;
-    pset.polygons_with_holes (back_inserter(pols));
-    return pols;
-}
-
-template<typename T>
-T permute(T vec, const std::vector<int>& indices) {
-    assert(sz(vec) == sz(indices));
-    T permuted = vec;
-    for(size_t i = 0; i < indices.size(); ++i) {
-        permuted[i] = vec[indices[i]];
-    }
-    return permuted;
-}
-
 vector<Polygon> fix_repeated_points(Polygon pol) {
     vector<Point> points;
     foe(p, pol) points.push_back(p);
@@ -65,51 +39,6 @@ vector<Polygon> fix_repeated_points(Polygon pol) {
     vector<Polygon> res;
     foe(p, fix_repeated_points(a)) res.push_back(p);
     foe(p, fix_repeated_points(b)) res.push_back(p);
-    return res;
-}
-
-bool is_completely_inside(Polygon_set a, Polygon_set b) {
-    Polygon_set t; t.difference(b,a);
-    return t.is_empty();
-}
-
-Polygon scale_polygon(Polygon pol, FT scale) {
-    foe(e, pol) {
-        e = {e.x() * scale, e.y() * scale};
-    }
-    return pol;
-}
-
-ItemsContainer scale_items(ItemsContainer items, FT scale) {
-    foe(item, items) {
-        item.pol = scale_polygon(item.pol, scale);
-    }
-    return items;
-}
-
-
-void assert_is_integer_polygon(Polygon& pol) {
-    foe(p, pol) {
-        assert(is_integer(p.x()));
-        assert(is_integer(p.y()));
-    }
-}
-
-Polygon get_bounding_box(Polygon& pol) {
-    FT mnx = 1e18, mxx = -1e18, mny = 1e18, mxy = -1e18;
-    foe(p, pol) mnx = min(mnx, p.x());
-    foe(p, pol) mxx = max(mxx, p.x());
-    foe(p, pol) mny = min(mny, p.y());
-    foe(p, pol) mxy = max(mxy, p.y());
-    mnx = floor_exact(mnx);
-    mxx = ceil_exact(mxx);
-    mny = floor_exact(mny);
-    mxy = ceil_exact(mxy);
-    Polygon res;
-    res.push_back(Point(mnx, mny));
-    res.push_back(Point(mxx, mny));
-    res.push_back(Point(mxx, mxy));
-    res.push_back(Point(mnx, mxy));
     return res;
 }
 
@@ -135,6 +64,7 @@ private:
     GurobiCallback* callbackobj;
 public:
 
+    // TODO: remove static
     static FT scale; // = FT(1) / FT(15000); // IMPORTANT: it is important to set it like 1/int. the inverse must be integer
     static FT inf; // = 250000000 * scale.to_double(); // upper bound on coordinates
     static FT biginf; // = 3e8; // BIG M, must be greater than inf * scale * inf * scale
@@ -152,7 +82,7 @@ public:
                 mx = max(mx, p.y() < 0 ? -p.y() : p.y());
             }
         }
-        foe(p, input.container) {
+        foe(p, get_vertices_pset(input.container)) {
             mx = max(mx, p.x() < 0 ? -p.x() : p.x());
             mx = max(mx, p.y() < 0 ? -p.y() : p.y());
         }
@@ -274,23 +204,6 @@ public:
             if(problem) add_variable(in_use_binaries[i]);
         }
         return in_use_binaries;
-    }
-    vector<int> sort_by_value_over_area(ItemsContainer items) {
-        vector<int> idxs (sz(items)); iota(idxs.begin(), idxs.end(), 0);
-        sort(idxs.begin(), idxs.end(), [&](int a, int b) {
-            return FT(items[a].value) / items[a].pol.area() > FT(items[b].value) / items[b].pol.area();
-        });
-        /*sort(items.begin(), items.end(), [](Item& a, Item& b) {
-            return FT(a.value) / a.pol.area() > FT(b.value) / b.pol.area();
-        });*/
-        return idxs;
-    }
-    vector<int> sort_by_area(ItemsContainer items) {
-        vector<int> idxs (sz(items)); iota(idxs.begin(), idxs.end(), 0);
-        sort(idxs.begin(), idxs.end(), [&](int a, int b) {
-            return items[a].pol.area() > items[b].pol.area();
-        });
-        return idxs;
     }
     pair<vector<MIPVariable>, vector<MIPConstraint>> get_iteminitem_constraints(
         pair<MIPVariable, MIPVariable>& p1,
@@ -416,10 +329,11 @@ public:
     }
 
     PackingInput scalesnap_input(PackingInput& input) {
-        cout << "Original container area: " << input.container.area().to_double() << endl;
+        auto container = get_single_polygon(input.container);
+        cout << "Original container area: " << container.area().to_double() << endl;
         Polygon scaled_container;
         {
-            auto t = get_complement(Polygon_set(scale_polygon(input.container, FT(scale))));
+            auto t = get_complement(Polygon_set(scale_polygon(container, FT(scale))));
             t.intersection(get_big_square());
             auto v = to_polygon_vector_ref(SnapToGrid(t).space);
             assert(sz(v) == 1);
@@ -428,9 +342,9 @@ public:
             scaled_container.reverse_orientation();
         }
         if(scale < 1) {
-            // assert(is_completely_inside(Polygon_set(input.container), Polygon_set(scaled_container)));
+            // assert(is_completely_inside(Polygon_set(container), Polygon_set(scaled_container)));
         } else {
-            //assert(is_completely_inside(Polygon_set(scaled_container), Polygon_set(input.container)));
+            //assert(is_completely_inside(Polygon_set(scaled_container), Polygon_set(container)));
         }
         cout << "Snapped container area: " << scaled_container.area().to_double() << endl;
         foe(p, scaled_container) {
@@ -440,7 +354,7 @@ public:
             //assert(p.y() >= 0);
         }
         PackingInput modified_input {
-            scaled_container,
+            Polygon_set(scaled_container),
             scale_items(input.items, FT(scale))
         };
         foe(item, modified_input.items) {
@@ -679,9 +593,7 @@ public:
         }
         return solution;
     }
-
 };
-
 FT MIPPackingHelpers::scale = 1; 
 FT MIPPackingHelpers::max_partition_size = 1; 
 FT MIPPackingHelpers::biginf = 1; 
@@ -722,8 +634,10 @@ void OptimalPackingCallback::callback() {
 
 PackingOutput OptimalPackingCallback::run(PackingInput _input) {
 
+    get_single_polygon(_input.container); // just asserting that it is a single polygon
+
     cout << "[c++] Optimal algorithm using gurobi callback optimization" << endl;
-    cb_input = {_input.container, _input.items.expand()};
+    PackingInput cb_input = {_input.container, _input.items.expand()};
 
     cb_set_problem(&cb_problem);
     cb_problem.set_callback(this);
@@ -739,7 +653,10 @@ PackingOutput OptimalPackingCallback::run(PackingInput _input) {
     cb_xys = helper.get_and_add_xy_ref_variables(sz(cb_input.items));
 
     cout << "[c++] Adding items inside container constraints" << endl;
-    helper.add_constraints_inside_convex_polygon(cb_input.container, cb_input.items, cb_in_use_binaries, cb_xys);
+    {
+        auto p = get_single_polygon(cb_input.container);
+        helper.add_constraints_inside_convex_polygon(p, cb_input.items, cb_in_use_binaries, cb_xys);
+    }
 
     cout << "[c++] Adding items no overlap constraints using bounding boxes" << endl;
     fon(i, sz(cb_input.items)) fon(j, i) {
@@ -772,6 +689,8 @@ PackingOutput OptimalPackingCallback::run(PackingInput _input) {
 
 PackingOutput OptimalPackingSlow::run(PackingInput _input) {
 
+    get_single_polygon(_input.container); // just asserting that it is a single polygon
+
     cout << "[c++] Optimal slow algorithm" << endl;
 
     cout << "[c++] Scaling input" << endl;
@@ -792,7 +711,10 @@ PackingOutput OptimalPackingSlow::run(PackingInput _input) {
     auto xys = helper.get_and_add_xy_ref_variables(sz(input.items));
 
     cout << "[c++] Adding items inside container constraints" << endl;
-    helper.add_constraints_inside_convex_polygon(input.container, input.items, in_use_binaries, xys);
+    {
+        auto p = get_single_polygon(input.container);
+        helper.add_constraints_inside_convex_polygon(p, input.items, in_use_binaries, xys);
+    }
 
     cout << "[c++] Adding items no overlap variables and constraints" << endl;
     fon(i, sz(input.items)) fon(j, i) {
@@ -817,6 +739,8 @@ PackingOutput OptimalPackingSlow::run(PackingInput _input) {
 }
 
 PackingOutput OptimalPackingFast::run(PackingInput _input) {
+
+    get_single_polygon(_input.container); // just asserting that it is a single polygon
 
     cout << "[c++] Optimal fast algorithm" << endl;
     PackingInput input {
@@ -856,7 +780,10 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
         xys = helper.get_and_add_xy_ref_variables(sz(subset));
 
         cout << "[c++] Adding items inside container constraints" << endl;
-        helper.add_constraints_inside_convex_polygon(input.container, subset, in_use_binaries, xys);
+        {
+            auto p = get_single_polygon(input.container);
+            helper.add_constraints_inside_convex_polygon(p, subset, in_use_binaries, xys);
+        }
 
         cout << "[c++] Adding items no overlap variables and constraints" << endl;
         fon(i, sz(subset)) fon(j, i) {
@@ -900,7 +827,8 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
     return output;
 }
 
-PackingOutput HeuristicPackingFast::run(PackingInput _input) {
+// TODO: call this something  else
+PackingOutput HeuristicPackingMIP::run(PackingInput _input) {
 
     cout << "[c++] Optimal fast algorithm" << endl;
     MIPPackingHelpers helper (NULL, NULL);
@@ -949,7 +877,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
 
         cout << "[c++] Compute allowed space" << endl;
         //Polygon_set allowed_space;
-        //allowed_space.intersection(Polygon_set(input.container), get_complement(existing)); // TODO: dont compute this every time if not changed
+        //allowed_space.intersection(input.container, get_complement(existing)); // TODO: dont compute this every time if not changed
 
         cout << "[c++] Adding items inside container constraints" << endl;
         //auto t = Polygon_set(to_polygon_vector(allowed_space)[0].outer_boundary());
@@ -960,7 +888,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
             }
         }
         Polygon_set allowed_space;
-        allowed_space.intersection(Polygon_set(input.container), get_complement(finalone)); // TODO: dont compute this every time if not changed
+        allowed_space.intersection(input.container, get_complement(finalone)); // TODO: dont compute this every time if not changed
         helper.add_constraints_inside_polygon_set(
             allowed_space,
             items,
@@ -1004,7 +932,7 @@ PackingOutput HeuristicPackingFast::run(PackingInput _input) {
             solution[original_xys[i].fi.se] = x;
             solution[original_xys[i].se.se] = y;
             auto pol = item.move_ref_point(Point(x,y)).pol;
-            assert(is_completely_inside(Polygon_set(input.container), Polygon_set(pol)));
+            assert(is_completely_inside(input.container, Polygon_set(pol)));
             assert(is_completely_inside(get_complement(existing), Polygon_set(pol)));
             existing.join(pol);
             number_of_included_items++;
@@ -1058,17 +986,18 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int so
         assert(is_integer(p.x()));
         assert(is_integer(p.y()));
         Item new_item = item.move_ref_point(p);
-        // assert(is_completely_inside(Polygon_set(input.container), Polygon_set(new_item.pol)));
+        // assert(is_completely_inside(input.container, Polygon_set(new_item.pol)));
         output.add_item(new_item);
     };
     Polygon_set existing;
     int number_of_included_items = 0;
+    Polygon_set complement_of_container = get_complement(input.container);
     fon(i, sz(input.items)) {
         if(print) cout << "[c++] Iteration " << (i + 1) << " / " << sz(input.items) << endl;
         auto& item = input.items[i];
 
         if(print) cout << "[c++] Computing configuration space" << endl;
-        Polygon_set disallowed_space = get_complement(Polygon_set(input.container));
+        Polygon_set disallowed_space = complement_of_container;
         disallowed_space.join(existing);
         auto config_space = ConfigurationSpace(
             disallowed_space,
@@ -1148,7 +1077,7 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input) {
         assert(is_integer(p.x()));
         assert(is_integer(p.y()));
         Item new_item = item.move_ref_point(p);
-        // assert(is_completely_inside(Polygon_set(input.container), Polygon_set(new_item.pol)));
+        // assert(is_completely_inside(input.container, Polygon_set(new_item.pol)));
         output.add_item(new_item);
     };
     Polygon_set existing;
@@ -1158,7 +1087,7 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input) {
         auto& item = input.items[i];
 
         cout << "[c++] Computing configuration space" << endl;
-        Polygon_set disallowed_space = get_complement(Polygon_set(input.container));
+        Polygon_set disallowed_space = get_complement(input.container);
         disallowed_space.join(existing);
         auto config_space = ConfigurationSpace(
             disallowed_space,
@@ -1237,9 +1166,9 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     input.items = input.items.expand();
     MIPPackingHelpers helper (NULL, NULL);
     vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items);
-    debug(sz(input.items));
-    debug(sorted_idxs);
     input.items = permute(input.items, sorted_idxs);
+
+    auto container = get_single_polygon(input.container);
 
     // Compute parameters
     auto get_average_area = [](ItemsContainer& items) -> FT {
@@ -1256,7 +1185,7 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     assert(square_size >= 10);
 
     // Get grid dimensions
-    auto bbox = get_bounding_box(input.container);
+    auto bbox = get_bounding_box(container);
     Point lowest = bbox[0];
     Point rightmost = bbox[2];
     Point highest= bbox[2];
@@ -1280,7 +1209,7 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     cout << "[c++] Number of steps in y direction: " << number_of_steps_y.to_double() << endl;
 
     // Generate containers
-    vector<Polygon> containers;
+    vector<Polygon_set> containers;
     fon(_i, number_of_steps_x) {
         fon(_j, number_of_steps_y) {
             FT i = _i;
@@ -1292,12 +1221,11 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
                 square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + (j + FT(1)) * square_size));
                 square.push_back(Point(start.x() + i * square_size, start.y() + (j + FT(1)) * square_size));
             }
-            Polygon_set allowed_space (Polygon_set(input.container));
+            Polygon_set allowed_space (container);
             allowed_space.intersection(Polygon_set(square));
             if(allowed_space.is_empty()) continue;
-            assert(to_polygon_vector(allowed_space).size() == 1);
-            assert(to_polygon_vector(allowed_space)[0].number_of_holes() == 0);
-            containers.push_back(to_polygon_vector(allowed_space)[0].outer_boundary());
+            get_single_polygon(allowed_space); // for assertions
+            containers.push_back(allowed_space);
         }
     }
     int number_of_containers = sz(containers);
@@ -1394,17 +1322,29 @@ public:
         return sum / FT(sz(items));
     }
 
-    FT get_width(Polygon& pol) {
+    FT get_width(Polygon_set& pol) {
         auto bbox = get_bounding_box(pol);
         return bbox[2].x() - bbox[0].x();
     }
 
-    FT get_height(Polygon& pol) {
+    FT get_height(Polygon_set& pol) {
         auto bbox = get_bounding_box(pol);
         return bbox[2].y() - bbox[0].y();
     }
 
-    vector<Polygon> overlay_grid(Polygon& container, FT square_size, bool random_offset=true) {
+    FT area(Polygon_set& pset) {
+        FT res = 0;
+        foe(pwh, to_polygon_vector(pset)) {
+            res += pwh.outer_boundary().area();
+            foe(hole, pwh.holes()) {
+                assert(hole.area() < 0);
+                res += hole.area(); // hole area is negative
+            }
+        }
+        return res;
+    }
+
+    vector<Polygon_set> overlay_grid(Polygon_set& container, FT square_size, bool random_offset=true) {
         Point start;
         {
             auto bbox = get_bounding_box(container);
@@ -1421,7 +1361,7 @@ public:
         FT height = get_height(container) + FT(4);
         FT number_of_steps_x = ceil_exact(width / square_size);
         FT number_of_steps_y = ceil_exact(height / square_size);
-        vector<Polygon> containers;
+        vector<Polygon_set> containers;
         fon(_i, number_of_steps_x) {
             fon(_j, number_of_steps_y) {
                 FT i = _i;
@@ -1436,9 +1376,10 @@ public:
                 Polygon_set allowed_space (container);
                 allowed_space.intersection(square);
                 if(allowed_space.is_empty()) continue;
-                assert(to_polygon_vector(allowed_space).size() == 1);
-                assert(to_polygon_vector(allowed_space)[0].number_of_holes() == 0);
-                containers.push_back(to_polygon_vector(allowed_space)[0].outer_boundary());
+                //assert(to_polygon_vector(allowed_space).size() == 1);
+                //assert(to_polygon_vector(allowed_space)[0].number_of_holes() == 0);
+                //containers.push_back(to_polygon_vector(allowed_space)[0].outer_boundary());
+                containers.push_back(allowed_space);
             }
         }
         return containers;
@@ -1503,7 +1444,6 @@ PackingOutput HeuristicPackingRecursive::run(PackingInput _input) {
         item_indices.push_back(input.items[i].idx);
     }
     AdvancedItemsContainer items (input.items);
-    debug(sz(items));
     PackingOutput toutput (input);
     solve(input.container, items, toutput, 0);
     PackingOutput output (_input);
@@ -1515,15 +1455,15 @@ PackingOutput HeuristicPackingRecursive::run(PackingInput _input) {
 }
 
 void HeuristicPackingRecursive::solve(
-    Polygon& container,
+    Polygon_set& container,
     AdvancedItemsContainer& items,
     PackingOutput& output,
     int depth
 ) {
     cout << "[c++] Recursive solving at depth " << depth << endl;
     if(sz(items) == 0) return;
-    vector<Polygon> sub_containers;
-    if(sz(items) > MAX_ITEMS_IN_PACKING && container.area() / items.avg_area > FT(MAX_ITEMS_IN_PACKING) / FT(2)) { // SPACE FOR TOO MANY ITEMS
+    vector<Polygon_set> sub_containers;
+    if(sz(items) > MAX_ITEMS_IN_PACKING && HeuristicPackingHelpers().area(container) / items.avg_area > FT(MAX_ITEMS_IN_PACKING) / FT(2)) { // SPACE FOR TOO MANY ITEMS
         cout << "[c++] Splitting container" << endl;
         FT square_size = sqrt((FT(MAX_ITEMS_IN_PACKING) / FT(2) * items.avg_area).to_double()) - 2;
         assert(square_size >= 10);
@@ -1539,8 +1479,7 @@ void HeuristicPackingRecursive::solve(
             FT prev_score = output.get_score();
             set<int> unused_indices;
             foe(idx, indices) unused_indices.insert(idx);
-            Polygon_set packed (container);
-            packed = get_complement(packed);
+            Polygon_set packed = get_complement(container);
             foe(item, toutput.items) {
                 packed.join(item.pol);
                 Item new_item {item.value, 1, item.pol, indices[item.idx], Vector(0,0)};
@@ -1551,9 +1490,10 @@ void HeuristicPackingRecursive::solve(
                 items.add_item(idx);
             }
             Polygon_set empty_space = get_complement(packed);
-            foe(pwh, to_polygon_vector(empty_space)) {
-                sub_containers.push_back(pwh.outer_boundary()); // TODO: start here
-            }
+            sub_containers.push_back(empty_space); // TODO: START HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            /*foe(pwh, to_polygon_vector(empty_space)) {
+                sub_containers.push_back(pwh);
+            }*/
             FT new_score = output.get_score();
             cout << "[c++] Score: " << new_score.to_double() << endl;
             if(prev_score > 0) cout << "[c++] Score improvement: " << new_score.to_double() / prev_score.to_double() * 100 - 100 << "%" << endl;
@@ -1580,6 +1520,8 @@ void HeuristicPackingRecursive::solve(
     - simply repack a space. just remove the items in that space and run the recursive algorithm with all items (the removed and the additional not placed)
         - or potentially repack and then fill holes with items that are not in the space (extra items)
 4. Improvements to discuss
+    - I think (by intutiion) that MIP on a pset (more polygons) is slower than on a pwh
+    - Is it a good idea to pack into a polygon set (set of holes) at once?
     - Different constant than 2 for max param?
     - Keep items sorted by area and pick a fair distribution less than.
     - Ensure no items can be placed.

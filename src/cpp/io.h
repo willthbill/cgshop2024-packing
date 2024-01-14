@@ -40,7 +40,7 @@ public:
 };
 
 struct PackingInput {
-    Polygon container;
+    Polygon_set container;
     ItemsContainer items;
 };
 

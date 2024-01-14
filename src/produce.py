@@ -34,10 +34,12 @@ for name in _names:
 best_filenames = []
 average_rel_worst = 0
 average_rel_strong = 0
+average_rel_best = 0
 cnt = 0
 for name in names:
     names[name].sort(key=lambda x: x["score"], reverse=True)
     worst = names[name][-1]["score"]
+    best_of_all = names[name][0]["score"]
     names[name] = list(filter(lambda x: match_output_path in x["output_filename"], names[name]))
     if len(names[name]) == 0:
         continue
@@ -52,19 +54,24 @@ for name in names:
     print(f"   {weak} >= {strong} >= {scores}")
     rel_strong = scores[0] / strong
     rel_worst = scores[0] / worst
+    rel_best = scores[0] / best_of_all
     average_rel_strong += rel_strong
     average_rel_worst += rel_worst
+    average_rel_best += rel_best
     cnt += 1
     print(f"   relative to strong: {rel_strong}")
     print(f"   relative to worst: {rel_worst}")
+    print(f"   relative to best of all: {rel_best}")
     print(f"   best: {best['output_dir']}")
     best_filenames.append(best["output_filename"])
 
 average_rel_strong /= cnt
 average_rel_worst /= cnt
+average_rel_best /= cnt
 
 print(f"\nAverage relative to strong: {average_rel_strong}")
 print(f"Average relative to worst: {average_rel_worst}")
+print(f"Average relative to best of all: {average_rel_best}")
 
 submission_filename = "submission.zip"
 with zipfile.ZipFile(submission_filename, 'w') as zipf:

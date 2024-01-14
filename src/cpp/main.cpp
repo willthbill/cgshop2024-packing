@@ -19,7 +19,7 @@ PackingInput input2cgal(
     vector<pii>& _container,
     vector<tuple<int,int,vector<pii>>>& _items
 ) {
-    auto container = points2polygon(_container);
+    auto container = Polygon_set(points2polygon(_container));
     ItemsContainer items;
     int idx = 0;
     foe(item, _items) {
@@ -65,8 +65,8 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorith
     PackingInput input = input2cgal(_container, _items);
     cout << "[c++] input information: " << endl;
     cout << "      number of items: " << sz(input.items) << endl;
-    cout << "      number of vertices on container: " << sz(input.container) << endl;
-    PackingOutput res = optimal_algorithm(input);
+    cout << "      number of vertices on container: " << get_vertices_pset(input.container) << endl;
+    PackingOutput res = heuristic_algorithm(input);
     { // extra validation
         cout << "[c++] Validating result" << endl;
         PackingOutput val (input);

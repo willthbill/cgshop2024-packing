@@ -120,17 +120,6 @@ bool is_completely_outside(Polygon a, Polygon b) {
     return res == 0;
 }
 
-bool is_completely_inside(Polygon a, Polygon b) {
-    Polygon_set intersection; intersection.intersection(
-        to_polygon_set(a),
-        to_polygon_set(b)
-    );
-    auto arr = to_polygon_vector(intersection);
-    FT res = 0;
-    foe(p, arr) res += p.outer_boundary().area();
-    return res == b.area();
-}
-
 bool is_point_strictly_inside(Polygon poly, Point p) {
     switch (CGAL::bounded_side_2(poly.vertices_begin(), poly.vertices_end(), p)) {
         case CGAL::ON_BOUNDED_SIDE:
@@ -162,7 +151,7 @@ void PackingOutput::validate_result() {
                 cout << "!!!!! ITEM REFERENCE POINT IS INSIDE OTHER ITEM !!!!!" << endl;
             }
         }
-        if(!is_completely_inside(input.container, i1.pol)) {
+        if(!is_completely_inside(input.container, Polygon_set(i1.pol))) {
             cout << "!!!!! ITEM NOT IN CONTAINER !!!!!" << endl;
         }
     }
@@ -195,3 +184,21 @@ pair<PackingInput,map<int,int>> PackingOutput::get_equiv_input() {
         t
     }, mp);
 }
+
+    vector<int> sort_by_value_over_area(ItemsContainer items) {
+        vector<int> idxs (sz(items)); iota(idxs.begin(), idxs.end(), 0);
+        sort(idxs.begin(), idxs.end(), [&](int a, int b) {
+            return FT(items[a].value) / items[a].pol.area() > FT(items[b].value) / items[b].pol.area();
+        });
+        /*sort(items.begin(), items.end(), [](Item& a, Item& b) {
+            return FT(a.value) / a.pol.area() > FT(b.value) / b.pol.area();
+        });*/
+        return idxs;
+    }
+    vector<int> sort_by_area(ItemsContainer items) {
+        vector<int> idxs (sz(items)); iota(idxs.begin(), idxs.end(), 0);
+        sort(idxs.begin(), idxs.end(), [&](int a, int b) {
+            return items[a].pol.area() > items[b].pol.area();
+        });
+        return idxs;
+    }

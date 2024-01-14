@@ -116,7 +116,7 @@ public:
     PackingOutput run(PackingInput); 
 
     void solve(
-        Polygon& container,
+        Polygon_set& container,
         AdvancedItemsContainer& items,
         PackingOutput& output,
         int depth
