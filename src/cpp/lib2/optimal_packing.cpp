@@ -196,8 +196,8 @@ public:
             Polygon_set config_space_int;
             if(use_bounding_box) {
                 // Compute configuration space
-                Polygon_set disallowed (get_bounding_box(item1.pol));
-                auto bbox2 = get_bounding_box(item2.pol);
+                Polygon_set disallowed (get_int_bounding_box(item1.pol));
+                auto bbox2 = get_int_bounding_box(item2.pol);
                 config_space_int = ConfigurationSpace(
                     disallowed,
                     bbox2,

@@ -125,7 +125,7 @@ Polygon scale_polygon(Polygon pol, FT scale) {
     return pol;
 }
 
-Polygon get_bounding_box(vector<Point> arr) {
+Polygon get_int_bounding_box(vector<Point> arr) {
     FT mnx = 1e18, mxx = -1e18, mny = 1e18, mxy = -1e18;
     foe(p, arr) mnx = min(mnx, p.x());
     foe(p, arr) mxx = max(mxx, p.x());
@@ -159,12 +159,13 @@ vector<Point> get_vertices_pol(Polygon& pol) {
     return get_vertices_pset(pset);
 }
 
-Polygon get_bounding_box(Polygon& pol) {
-    return get_bounding_box(vector<Point>(pol.vertices_begin(), pol.vertices_end()));
+Polygon get_int_bounding_box(Polygon& pol) {
+    // return get_int_bounding_box(vector<Point>(pol.vertices_begin(), pol.vertices_end()));
+    return get_int_bounding_box(get_vertices_pol(pol));
 }
 
-Polygon get_bounding_box(Polygon_set& pset) {
-    return get_bounding_box(get_vertices_pset(pset));
+Polygon get_int_bounding_box(Polygon_set& pset) {
+    return get_int_bounding_box(get_vertices_pset(pset));
 }
 
 vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
@@ -174,12 +175,12 @@ vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
 }
 
 FT get_width(Polygon_set& pol) {
-    auto bbox = get_bounding_box(pol);
+    auto bbox = get_int_bounding_box(pol);
     return bbox[2].x() - bbox[0].x();
 }
 
 FT get_height(Polygon_set& pol) {
-    auto bbox = get_bounding_box(pol);
+    auto bbox = get_int_bounding_box(pol);
     return bbox[2].y() - bbox[0].y();
 }
 

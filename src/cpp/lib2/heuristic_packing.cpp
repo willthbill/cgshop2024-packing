@@ -87,7 +87,7 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int so
             assert(false);
         }
 next_item:
-        if(i % 15 == 0) cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
+        if(print && i % 15 == 0) cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
     }
 
     return output;
@@ -116,7 +116,7 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     assert(square_size >= 10);
 
     // Get grid dimensions
-    auto bbox = get_bounding_box(container);
+    auto bbox = get_int_bounding_box(container);
     Point lowest = bbox[0];
     Point rightmost = bbox[2];
     Point highest= bbox[2];
@@ -251,8 +251,8 @@ public:
     vector<Polygon_set> overlay_grid(Polygon_set& container, FT square_size, bool random_offset=true) {
         Point start;
         {
-            auto bbox = get_bounding_box(container);
-            Point start (bbox[0].x() - FT(2), bbox[0].y() - FT(2)); // -2 should not be necessary
+            auto bbox = get_int_bounding_box(container);
+            start = Point(bbox[0].x() - FT(2), bbox[0].y() - FT(2)); // -2 should not be necessary
             if(random_offset) {
                 int md = ((int)(square_size * 0.8).to_double());
                 start = Point(
@@ -263,8 +263,8 @@ public:
         }
         FT width = get_width(container) + FT(4);
         FT height = get_height(container) + FT(4);
-        FT number_of_steps_x = ceil_exact(width / square_size);
-        FT number_of_steps_y = ceil_exact(height / square_size);
+        FT number_of_steps_x = ceil_exact(width / square_size) + 2;
+        FT number_of_steps_y = ceil_exact(height / square_size) + 2;
         vector<Polygon_set> containers;
         fon(_i, number_of_steps_x) {
             fon(_j, number_of_steps_y) {
@@ -308,7 +308,11 @@ int AdvancedItemsContainer::size() {
 }
 void AdvancedItemsContainer::add_item(int idx) {
     avg_area = (avg_area * FT(size()) + items[idx].pol.area()) / FT(size() + 1);
-    available_items.insert({sorting_metric(idx), idx});
+    pair<FT,int> e = {sorting_metric(idx), idx};
+    if(available_items.find(e) != available_items.end()) {
+        cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ITEM ALREADY IN AVAILABLE ITEMS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
+    }
+    available_items.insert(e);
 }
 void AdvancedItemsContainer::erase_item(int idx) {
     if(size() == 1) avg_area = 0;
@@ -318,6 +322,7 @@ void AdvancedItemsContainer::erase_item(int idx) {
 pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(int k) { // TODO: do better than random
     ItemsContainer res;
     vector<int> indices;
+    // TODO: possibly try to sample with area below, but stop after a certain number of iterations if k is not reached
     rep(k) {
         int idx = rand() % sz(available_items);
         auto [value_over_area, item_idx] = *available_items.find_by_order(idx);
@@ -333,7 +338,7 @@ pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(in
 ///////////////////////
 
 ////// PARAMS ///////
-const int MAX_ITEMS_IN_PACKING = 1000;
+const int MAX_ITEMS_IN_PACKING = 200;
 ///////////////////////
 
 
@@ -362,20 +367,22 @@ void HeuristicPackingRecursive::solve(
     PackingOutput& output,
     int depth
 ) {
-    cout << "[c++] Recursive solving at depth " << depth << endl;
+    // cout << "[c++] Recursive solving at depth " << depth << endl;
     if(sz(items) == 0) {
-        cout << "[c++] No items left" << endl;
+        // cout << "[c++] No items left" << endl;
         return;
     }
     vector<Polygon_set> sub_containers;
-    if(sz(items) > MAX_ITEMS_IN_PACKING && area(container) / items.avg_area > FT(MAX_ITEMS_IN_PACKING) / FT(2)) { // SPACE FOR TOO MANY ITEMS
-        cout << "[c++] Splitting container" << endl;
-        FT square_size = sqrt((FT(MAX_ITEMS_IN_PACKING) / FT(2) * items.avg_area).to_double()) - 2;
+    // TODO: area might be small because of psets, but completely high (very high)
+    if(sz(items) > MAX_ITEMS_IN_PACKING && area(container) / items.avg_area > FT(MAX_ITEMS_IN_PACKING) / FT(1.9)) { // SPACE FOR TOO MANY ITEMS
+        cout << "[c++] Splitting container at depth " << depth << endl;
+        FT square_size = sqrt((FT(MAX_ITEMS_IN_PACKING) / FT(2.1) * items.avg_area).to_double()) - 2;
         assert(square_size >= 10);
         sub_containers = HeuristicPackingHelpers().overlay_grid(container, square_size, depth != 0); // choose random offset when depth is not 0
     } else {
-        cout << "[c++] Packing container directly" << endl;
+        //cout << "[c++] Packing container directly" << endl;
         // TODO: we could samples just 2 * container.area() / items.avg_area items
+            // YES do that
         // TODO: only consider items that fit when computing avg_area i guess, when sampling is updated to only include items with small enough area
         auto [sampled_items, indices] = items.extract_items_random(min(sz(items), MAX_ITEMS_IN_PACKING)); // , container.area()
         PackingInput tinput {container, sampled_items};
@@ -386,19 +393,19 @@ void HeuristicPackingRecursive::solve(
             foe(idx, indices) unused_indices.insert(idx);
             Polygon_set packed = get_complement(container);
             foe(item, toutput.items) {
-                packed.join(item.pol);
+                packed.join(item.pol); // TODO: add 1.5 square around item.pol
                 Item new_item {item.value, 1, item.pol, indices[item.idx], Vector(0,0)};
                 output.add_item(new_item);
                 unused_indices.erase(indices[item.idx]);
             }
             Polygon_set empty_space = get_complement(packed);
-            // sub_containers.push_back(empty_space);
+            // sub_containers.push_back(empty_space); // TODO: this is probably better in some cases
             foe(pwh, to_polygon_vector(empty_space)) {
                 sub_containers.push_back(Polygon_set(pwh));
             }
             FT new_score = output.get_score();
-            cout << "[c++] Score: " << new_score.to_double() << endl;
-            if(prev_score > 0) cout << "[c++] Score improvement: " << new_score.to_double() / prev_score.to_double() * 100 - 100 << "%" << endl;
+            if(prev_score > 0) cout << "[c++] Score improvement: " << new_score.to_double() / prev_score.to_double() * 100 - 100 << "%" << " at depth " << depth << endl;
+            else cout << "[c++] First score " << new_score.to_double() << " at depth " << depth << endl;
         } else {
             foe(idx, indices) {
                 unused_indices.insert(idx);
@@ -408,10 +415,11 @@ void HeuristicPackingRecursive::solve(
             items.add_item(idx);
         }
     }
-    cout << "[c++] Number of sub-containers: " << sz(sub_containers) << endl;
+    // cout << "[c++] Number of sub-containers: " << sz(sub_containers) << endl;
     foe(sub_container, sub_containers) {
         solve(sub_container, items, output, depth + 1);
     }
+    // TODO: we are not filling holes after packing squares!!!!!
 }
 ///////////////////////
 

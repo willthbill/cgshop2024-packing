@@ -32,15 +32,15 @@ Polygon scale_polygon(Polygon pol, FT scale);
 
 void assert_is_integer_polygon(Polygon& pol); 
 
-Polygon get_bounding_box(std::vector<Point> arr); 
+Polygon get_int_bounding_box(std::vector<Point> arr); 
 
 std::vector<Point> get_vertices_pset(Polygon_set& pset); 
 
 std::vector<Point> get_vertices_pol(Polygon& pol); 
 
-Polygon get_bounding_box(Polygon& pol); 
+Polygon get_int_bounding_box(Polygon& pol); 
 
-Polygon get_bounding_box(Polygon_set& pset); 
+Polygon get_int_bounding_box(Polygon_set& pset); 
 
 int get_number_of_vertices(Polygon_set pset); 
 
