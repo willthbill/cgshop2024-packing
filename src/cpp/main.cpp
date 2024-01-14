@@ -54,8 +54,8 @@ OUT_TYPE heuristic_algorithm(IN_TYPE input) {
     cout << "[c++] RUNNING HEURISTIC ALGORITHM" << endl;
     // return HeuristicPackingFast().run(input);
     // return HeuristicPackingNOMIP().run(input);
-    return HeuristicPackingGrid().run(input);
-    // return HeuristicPackingRecursive().run(input);
+    // return HeuristicPackingGrid().run(input);
+    return HeuristicPackingRecursive().run(input);
 }
 
 vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorithm(

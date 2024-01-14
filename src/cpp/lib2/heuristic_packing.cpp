@@ -74,7 +74,7 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int so
                 foab(dy, -10, 5) foab(dx, -10, 5) { // TODO: probably don't need to check negative
                     Point p (floor_exact(v.x() + dx), floor_exact(v.y() + dy));
                     if(config_space.oriented_side(p) != CGAL::ON_NEGATIVE_SIDE) {
-                        cout << "[c++] Found lowest integral point: " << p << endl;
+                        if(print) cout << "[c++] Found lowest integral point: " << p << endl;
                         add_item(item, p);
                         existing.join(item.move_ref_point(p).pol);
                         // turn to integer polygon
@@ -87,7 +87,7 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int so
             assert(false);
         }
 next_item:
-        cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
+        if(i % 15 == 0) cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
     }
 
     return output;
@@ -295,7 +295,6 @@ FT AdvancedItemsContainer::sorting_metric(int idx) {
     return items[idx].value / items[idx].pol.area();
 }
 AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
-    debug("here i am");
     items = _items;
     foe(item, items) assert(item.quantity == 1);
     fon(i, sz(items)) assert(items[i].idx == i);
@@ -303,7 +302,6 @@ AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
     fon(i, sz(items)) {
         add_item(i);
     }
-    debug("back here");
 }
 int AdvancedItemsContainer::size() {
     return sz(available_items);
@@ -335,7 +333,7 @@ pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(in
 ///////////////////////
 
 ////// PARAMS ///////
-const int MAX_ITEMS_IN_PACKING = 100;
+const int MAX_ITEMS_IN_PACKING = 1000;
 ///////////////////////
 
 
@@ -365,7 +363,10 @@ void HeuristicPackingRecursive::solve(
     int depth
 ) {
     cout << "[c++] Recursive solving at depth " << depth << endl;
-    if(sz(items) == 0) return;
+    if(sz(items) == 0) {
+        cout << "[c++] No items left" << endl;
+        return;
+    }
     vector<Polygon_set> sub_containers;
     if(sz(items) > MAX_ITEMS_IN_PACKING && area(container) / items.avg_area > FT(MAX_ITEMS_IN_PACKING) / FT(2)) { // SPACE FOR TOO MANY ITEMS
         cout << "[c++] Splitting container" << endl;
@@ -379,9 +380,9 @@ void HeuristicPackingRecursive::solve(
         auto [sampled_items, indices] = items.extract_items_random(min(sz(items), MAX_ITEMS_IN_PACKING)); // , container.area()
         PackingInput tinput {container, sampled_items};
         PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false);
+        set<int> unused_indices;
         if(sz(toutput.items)) {
             FT prev_score = output.get_score();
-            set<int> unused_indices;
             foe(idx, indices) unused_indices.insert(idx);
             Polygon_set packed = get_complement(container);
             foe(item, toutput.items) {
@@ -390,17 +391,21 @@ void HeuristicPackingRecursive::solve(
                 output.add_item(new_item);
                 unused_indices.erase(indices[item.idx]);
             }
-            foe(idx, unused_indices) {
-                items.add_item(idx);
-            }
             Polygon_set empty_space = get_complement(packed);
-            sub_containers.push_back(empty_space); // TODO: START HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            /*foe(pwh, to_polygon_vector(empty_space)) {
-                sub_containers.push_back(pwh);
-            }*/
+            // sub_containers.push_back(empty_space);
+            foe(pwh, to_polygon_vector(empty_space)) {
+                sub_containers.push_back(Polygon_set(pwh));
+            }
             FT new_score = output.get_score();
             cout << "[c++] Score: " << new_score.to_double() << endl;
             if(prev_score > 0) cout << "[c++] Score improvement: " << new_score.to_double() / prev_score.to_double() * 100 - 100 << "%" << endl;
+        } else {
+            foe(idx, indices) {
+                unused_indices.insert(idx);
+            }
+        }
+        foe(idx, unused_indices) {
+            items.add_item(idx);
         }
     }
     cout << "[c++] Number of sub-containers: " << sz(sub_containers) << endl;

@@ -4,17 +4,19 @@ import zipfile
 from py.io import read_output_metadata
 
 
-def find_solution_json_files(directory):
+def find_solution_json_files(directories):
     matches = []
-    for root, _dirnames, filenames in os.walk(directory):
-        for filename in fnmatch.filter(filenames, 'solution.json'):
-            matches.append(os.path.join(root, filename))
+    for directory in directories:
+        for root, _dirnames, filenames in os.walk(directory):
+            for filename in fnmatch.filter(filenames, 'solution.json'):
+                matches.append(os.path.join(root, filename))
     return matches
 
 
+DEV="DEV" in os.environ and os.environ["DEV"] == "1"
 match_input_path=os.environ["MATCH_INPUT_PATH"] if "MATCH_INPUT_PATH" in os.environ else "input/cg24"
 match_output_path=os.environ["MATCH_OUTPUT_PATH"] if "MATCH_OUTPUT_PATH" in os.environ else "output/runs"
-solution_files = find_solution_json_files("output/runs")
+solution_files = find_solution_json_files(["output/runs"] + (["/tmp/runs"] if DEV else []))
 print(len(solution_files), "solutions found\n")
 
 names = {}

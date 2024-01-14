@@ -12,32 +12,37 @@ from multiprocessing import Pool
 # time.sleep(20)
 
 
-def get_output_dir(run_id, name, filename):
-    dir = f"output/runs/{run_id}/{get_output_directory_for_instance(name, filename)}"
+def get_base_output_dir(run_id, use_tmp=True):
+    start = "/tmp" if use_tmp else "output"
+    dir = f"{start}/runs/{run_id}"
     return dir
 
+def get_output_dir(run_id, name, filename, use_tmp=True):
+    dir = f"{get_base_output_dir(run_id, use_tmp=use_tmp)}/{get_output_directory_for_instance(name, filename)}"
+    return dir
 
 def get_environment_variables(env):
     should_write = "SHOULD_WRITE" in env and env["SHOULD_WRITE"] == "1"
+    in_production = "PRODUCTION" in env and env["PRODUCTION"] == "1"
     should_visualize = "VISUALIZE" in env and env["VISUALIZE"] == "1"
     description = ""
     if "DESC" in env: description = env["DESC"]
-    if should_write: assert len(description) > 3
+    if in_production and should_write: assert len(description) > 3
     only_stats = "ONLY_STATS" in env and env["ONLY_STATS"] == "1"
     if only_stats: should_write = False
     run_id = env["RUN_ID"] if "RUN_ID" in env else generate_run_id()
-    return should_write, description, only_stats, run_id, should_visualize
+    return should_write, description, only_stats, run_id, should_visualize, in_production
 
 
 def run_sequentially(p):
     instances = p[0]
     env = p[1]
 
-    should_write, description, only_stats, run_id, should_visualize = get_environment_variables(env)
+    should_write, description, only_stats, run_id, should_visualize, in_production = get_environment_variables(env)
 
     for name, filename, input_conf in instances:
 
-        dir = get_output_dir(run_id, name, filename)
+        dir = get_output_dir(run_id, name, filename, not in_production)
 
         if should_write:
             if not os.path.exists(dir):
@@ -101,6 +106,11 @@ def run_command(p):
     #         f.write(output_stderr)
     print(f"[py-manager] Finished running {command}")
 
+def summarize(input_dir, output_dir, in_production):
+    command = f"MATCH_INPUT_PATH={input_dir} MATCH_OUTPUT_PATH={output_dir} ./bin/runpythonfile produce.py"
+    if not in_production:
+        command = f"DEV=1 {command}"
+    subprocess.run(command, shell=True, check=False)
 
 instance_files = os.environ["INSTANCE_FILES"]
 print("[py-manager] Instance files:", instance_files)
@@ -113,7 +123,7 @@ if in_parallel:
 
     print(f"[py-manager] RUNNING IN PARALLEL WITH MAX_THREADS={max_threads}")
 
-    should_write, description, only_stats, run_id, should_visualize = get_environment_variables(os.environ)
+    should_write, description, only_stats, run_id, should_visualize, in_production = get_environment_variables(os.environ)
 
     # inputs = []
     # for name, filename, input_conf in instances:
@@ -158,6 +168,7 @@ if in_parallel:
     with Pool(max_threads) as pool:
         pool.map(run_command, commands)
     print("[py manager] FINISHED ALL INSTANCES")
+    summarize(instance_files, get_base_output_dir(run_id, not in_production), in_production)
 else:
     print("[py] RUNNING IN SEQUENCE")
     run_sequentially((instances, os.environ))
