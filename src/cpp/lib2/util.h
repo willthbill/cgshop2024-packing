@@ -26,7 +26,7 @@ bool is_completely_outside(Polygon_set a, Polygon_set b);
 bool is_completely_inside(Polygon a, Polygon b); 
 bool is_completely_inside(Polygon_with_holes a, Polygon_with_holes b); 
 
-Polygon get_single_polygon(Polygon_set);
+Polygon get_single_polygon(Polygon_set&);
 
 Polygon scale_polygon(Polygon pol, FT scale); 
 

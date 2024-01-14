@@ -145,6 +145,7 @@ target_link_libraries(
     main${pybind11_suffix}
     optimal_packing
     com CGAL::CGAL
+    util
     io
 )
 
