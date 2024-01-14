@@ -8,6 +8,8 @@
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
 
+using namespace std;
+
 CGAL::Gmpq floor_exact(const CGAL::Gmpq &q) {
     // If the denominator is 1 or if 'q' is an integer, 'q' is already floored.
     if (q.denominator() == 1 || q == q.numerator()) {
@@ -123,21 +125,6 @@ Polygon scale_polygon(Polygon pol, FT scale) {
     return pol;
 }
 
-ItemsContainer scale_items(ItemsContainer items, FT scale) {
-    foe(item, items) {
-        item.pol = scale_polygon(item.pol, scale);
-    }
-    return items;
-}
-
-
-void assert_is_integer_polygon(Polygon& pol) {
-    foe(p, pol) {
-        assert(is_integer(p.x()));
-        assert(is_integer(p.y()));
-    }
-}
-
 Polygon get_bounding_box(vector<Point> arr) {
     FT mnx = 1e18, mxx = -1e18, mny = 1e18, mxy = -1e18;
     foe(p, arr) mnx = min(mnx, p.x());
@@ -180,6 +167,65 @@ Polygon get_bounding_box(Polygon_set& pset) {
     return get_bounding_box(get_vertices_pset(pset));
 }
 
+vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
+    vector<Polygon_with_holes> pols;
+    pset.polygons_with_holes (back_inserter(pols));
+    return pols;
+}
+
+FT get_width(Polygon_set& pol) {
+    auto bbox = get_bounding_box(pol);
+    return bbox[2].x() - bbox[0].x();
+}
+
+FT get_height(Polygon_set& pol) {
+    auto bbox = get_bounding_box(pol);
+    return bbox[2].y() - bbox[0].y();
+}
+
+FT area(Polygon_set& pset) {
+    FT res = 0;
+    foe(pwh, to_polygon_vector(pset)) {
+        res += pwh.outer_boundary().area();
+        foe(hole, pwh.holes()) {
+            assert(hole.area() < 0);
+            res += hole.area(); // hole area is negative
+        }
+    }
+    return res;
+}
+
+Polygon translate_point_to_origin(Polygon& pol, Point ref) {
+    if (pol.is_empty()) {
+        return pol;
+    }
+    std::vector<Point> translated_points;
+    for (const Point& point : pol.vertices()) {
+        translated_points.emplace_back(point.x() - ref.x(), point.y() - ref.y());
+    }
+    return Polygon(translated_points.begin(), translated_points.end());
+}
+
+// TODO: add to lib
+Polygon translate_centroid_to_origin(Polygon& pol) {
+    if (pol.is_empty()) {
+        return pol;
+    }
+    Point centroid = get_centroid(pol);
+    return translate_point_to_origin(pol, centroid);
+}
+
+// TODO: allow to use reference pol
+Polygon scale_polygon(Polygon pol, int s) {
+    Polygon scaled_poly;
+    for (const Point& vertex : pol.vertices()) {
+        FT x = vertex.x() * s;
+        FT y = vertex.y() * s;
+        scaled_poly.push_back(Point(x,y));
+    }
+    return scaled_poly;
+}
+
 int get_number_of_vertices(Polygon_set pset) {
     int res = 0;
     foe(pwh, to_polygon_vector(pset)) {
@@ -190,18 +236,34 @@ int get_number_of_vertices(Polygon_set pset) {
     }
     return res;
 }
-vector<Polygon_with_holes> to_polygon_vector_ref(Polygon_set pset) {
-    vector<Polygon_with_holes> pols;
-    pset.polygons_with_holes (back_inserter(pols));
-    return pols;
+
+void assert_is_integer_polygon(Polygon& pol) {
+    foe(p, pol) {
+        assert(is_integer(p.x()));
+        assert(is_integer(p.y()));
+    }
 }
 
-template<typename T>
-T permute(T vec, const std::vector<int>& indices) {
-    assert(sz(vec) == sz(indices));
-    T permuted = vec;
-    for(size_t i = 0; i < indices.size(); ++i) {
-        permuted[i] = vec[indices[i]];
+vector<Polygon> fix_repeated_points(Polygon pol) {
+    vector<Point> points;
+    foe(p, pol) points.push_back(p);
+    map<Point, int> mp;
+    int idx = -1;
+    fon(i, sz(points)) {
+        auto& p = points[i];
+        if(mp.count(p)) {
+            idx = i;
+            break;
+        }
+        mp[p] = i;
     }
-    return permuted;
+    if(idx == -1) return {pol};
+    Polygon a, b;
+    for(int i = 0; i < mp[points[idx]]; i++) a.push_back(points[i]);
+    for(int i = mp[points[idx]]; i < idx; i++) b.push_back(points[i]);
+    for(int i = idx; i < sz(points); i++) a.push_back(points[i]);
+    vector<Polygon> res;
+    foe(p, fix_repeated_points(a)) res.push_back(p);
+    foe(p, fix_repeated_points(b)) res.push_back(p);
+    return res;
 }

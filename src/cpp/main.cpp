@@ -42,15 +42,19 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> cgal2output(
 #define OUT_TYPE PackingOutput
 #define IN_TYPE PackingInput
 
-OUT_TYPE dummy_algorithm(IN_TYPE);
-OUT_TYPE optimal_algorithm(IN_TYPE);
+// OUT_TYPE dummy_algorithm(IN_TYPE);
+
+OUT_TYPE optimal_algorithm(IN_TYPE input) {
+    cout << "[c++] RUNNING OPTIMAL ALGORITHM" << endl;
+    return OptimalPackingFast().run(input);
+}
 
 OUT_TYPE heuristic_algorithm(IN_TYPE input) {
     cout << "[c++] RUNNING HEURISTIC ALGORITHM" << endl;
     // return HeuristicPackingFast().run(input);
     // return HeuristicPackingNOMIP().run(input);
-    // return HeuristicPackingGrid().run(input);
-    return HeuristicPackingRecursive().run(input);
+    return HeuristicPackingGrid().run(input);
+    // return HeuristicPackingRecursive().run(input);
 }
 
 vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorithm(
@@ -65,7 +69,7 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorith
     PackingInput input = input2cgal(_container, _items);
     cout << "[c++] input information: " << endl;
     cout << "      number of items: " << sz(input.items) << endl;
-    cout << "      number of vertices on container: " << get_vertices_pset(input.container) << endl;
+    cout << "      number of vertices on container: " << get_number_of_vertices(input.container) << endl;
     PackingOutput res = heuristic_algorithm(input);
     { // extra validation
         cout << "[c++] Validating result" << endl;

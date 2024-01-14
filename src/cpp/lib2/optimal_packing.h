@@ -49,7 +49,7 @@ public:
 
 };
 
-class HeuristicPackingFast {
+class HeuristicPackingMIP {
 
 private:
 

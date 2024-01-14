@@ -15,17 +15,6 @@ typedef PS::Squared_distance_cost            Cost;
 
 using namespace std;
 
-int get_number_of_vertices(Polygon_set pset) {
-    int res = 0;
-    foe(pwh, to_polygon_vector(pset)) {
-        res += pwh.outer_boundary().size();
-        foe(hole, pwh.holes()) {
-            res += hole.size();
-        }
-    }
-    return res;
-}
-
 Polygon_set SimplifyExpand::run(Polygon_set& pset, FT scale) {
     Polygon_set res;
     foe(pwh, to_polygon_vector(pset)) {

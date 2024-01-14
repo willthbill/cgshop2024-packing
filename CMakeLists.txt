@@ -98,7 +98,7 @@ target_link_libraries(io ${CGALLIB} util geometry_utils intersection_predicates)
 
 add_library(configuration_space SHARED src/cpp/lib2/configuration_space.cpp)
 target_precompile_headers(configuration_space PUBLIC ${PRECOMPILE_HEADERS})
-target_link_libraries(configuration_space ${CGALLIB} geometry_utils)
+target_link_libraries(configuration_space ${CGALLIB} geometry_utils util)
 
 add_library(mip SHARED src/cpp/lib2/mip/mip.cpp)
 target_link_libraries(mip ${CGALLIB})
@@ -111,41 +111,39 @@ target_link_libraries(gurobi_mip ${CGALLIB} mip ${GUROBI_CXX_LIBRARY} ${GUROBI_L
 
 add_library(snap SHARED src/cpp/lib2/snap.cpp)
 target_precompile_headers(snap PUBLIC ${PRECOMPILE_HEADERS})
-target_link_libraries(snap ${CGALLIB} intersection_predicates geometry_utils)
+target_link_libraries(snap ${CGALLIB} intersection_predicates geometry_utils util)
 
 add_library(convex_cover SHARED src/cpp/lib2/convex_cover.cpp)
 target_precompile_headers(convex_cover PUBLIC ${PRECOMPILE_HEADERS})
-target_link_libraries(convex_cover ${CGALLIB} partition_constructor visgraph cliquecover geometry_utils)
+target_link_libraries(convex_cover ${CGALLIB} partition_constructor visgraph cliquecover geometry_utils util)
 
 add_library(simplification SHARED src/cpp/lib2/simplification.cpp)
 target_precompile_headers(simplification PUBLIC ${PRECOMPILE_HEADERS})
-target_link_libraries(simplification ${CGALLIB} geometry_utils)
+target_link_libraries(simplification ${CGALLIB} geometry_utils util)
 
 add_library(optimal_packing SHARED src/cpp/lib2/optimal_packing.cpp)
 target_precompile_headers(optimal_packing PUBLIC ${PRECOMPILE_HEADERS})
-target_link_libraries(optimal_packing ${CGALLIB} partition_constructor gurobi_mip configuration_space geometry_utils io snap convex_cover simplification)
+target_link_libraries(optimal_packing ${CGALLIB} partition_constructor gurobi_mip configuration_space geometry_utils io snap convex_cover simplification util)
 
 ### algorithms ###
 #add_library(dummy_algorithm SHARED src/cpp/algorithms/dummy.cpp)
 #target_link_libraries(dummy_algorithm CGAL::CGAL util)
 
-add_library(optimal_algorithm SHARED src/cpp/algorithms/optimal.cpp)
-target_precompile_headers(optimal_algorithm PUBLIC ${PRECOMPILE_HEADERS})
-target_link_libraries(optimal_algorithm optimal_packing)
+# add_library(optimal_algorithm SHARED src/cpp/algorithms/optimal.cpp)
+# target_precompile_headers(optimal_algorithm PUBLIC ${PRECOMPILE_HEADERS})
+# target_link_libraries(optimal_algorithm optimal_packing)
 
 #add_executable(mip_example src/cpp/lib2/mip_example.cpp)
 #target_link_libraries(mip_example CGAL::CGAL CGAL::SCIP_support)
 
-add_executable(gurobi_example src/cpp/lib2/mip/gurobi_example.cpp)
-target_link_libraries(gurobi_example ${GUROBI_CXX_LIBRARY} ${GUROBI_LIBRARY})
+# add_executable(gurobi_example src/cpp/lib2/mip/gurobi_example.cpp)
+# target_link_libraries(gurobi_example ${GUROBI_CXX_LIBRARY} ${GUROBI_LIBRARY})
 
 ###### PY ######
 add_library(main${pybind11_suffix} SHARED src/cpp/main.cpp)
 target_link_libraries(
     main${pybind11_suffix}
-    # dummy_algorithm
     optimal_packing
-    optimal_algorithm
     com CGAL::CGAL
     io
 )

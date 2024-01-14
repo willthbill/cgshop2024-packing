@@ -37,7 +37,14 @@ public:
     auto end() const { return items.end(); }
 
     void pop_item();
+
+    std::vector<int> sort_by_value_over_area(); 
+    std::vector<int> sort_by_area();
+
+    FT get_average_area(); 
 };
+
+ItemsContainer scale_items(ItemsContainer items, FT scale);
 
 struct PackingInput {
     Polygon_set container;

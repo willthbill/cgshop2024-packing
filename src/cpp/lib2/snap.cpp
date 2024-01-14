@@ -12,13 +12,6 @@
 
 using namespace std;
 
-void assert_is_integer_polygon(Polygon& pol) {
-    foe(p, pol) {
-        assert(is_integer(p.x()));
-        assert(is_integer(p.y()));
-    }
-}
-
 // TODO: somehow specify the grid size
 // TODO: support polygon set
 SnapToGrid::SnapToGrid(Polygon_set pset) {
@@ -33,30 +26,6 @@ Polygon SnapToGrid::get_single_polygon() {
         return pwh.outer_boundary();
     }
     assert(false);
-}
-
-vector<Polygon> fix_repeated_points(Polygon pol) {
-    vector<Point> points;
-    foe(p, pol) points.push_back(p);
-    map<Point, int> mp;
-    int idx = -1;
-    fon(i, sz(points)) {
-        auto& p = points[i];
-        if(mp.count(p)) {
-            idx = i;
-            break;
-        }
-        mp[p] = i;
-    }
-    if(idx == -1) return {pol};
-    Polygon a, b;
-    for(int i = 0; i < mp[points[idx]]; i++) a.push_back(points[i]);
-    for(int i = mp[points[idx]]; i < idx; i++) b.push_back(points[i]);
-    for(int i = idx; i < sz(points); i++) a.push_back(points[i]);
-    vector<Polygon> res;
-    foe(p, fix_repeated_points(a)) res.push_back(p);
-    foe(p, fix_repeated_points(b)) res.push_back(p);
-    return res;
 }
 
 // this does not work exactly right. we check if the segment intersects in two district points.

@@ -841,7 +841,7 @@ PackingOutput HeuristicPackingMIP::run(PackingInput _input) {
     input.items = input.items.expand();
 
     cout << "[c++] Sorting items" << endl;
-    vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items);
+    vector<int> sorted_idxs = input.items.sort_by_value_over_area();
     input.items = permute(input.items, sorted_idxs);
 
     auto original_in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
@@ -970,14 +970,13 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int so
     if(print) cout << "[c++] Expanding items" << endl;
     input.items = input.items.expand();
 
-    MIPPackingHelpers helper (NULL, NULL);
     vector<int> sorted_idxs;
     if(sort_type == 0) {
         if(print) cout << "[c++] Sorting items by value/area" << endl;
-        sorted_idxs = helper.sort_by_value_over_area(input.items);
+        sorted_idxs = input.items.sort_by_value_over_area();
     } else if(sort_type == 1) {
         if(print) cout << "[c++] Sorting items by area" << endl;
-        sorted_idxs = helper.sort_by_area(input.items); // TODO: does this even sort non-increasingly?
+        sorted_idxs = input.items.sort_by_area(); // TODO: does this even sort non-increasingly?
     }
     input.items = permute(input.items, sorted_idxs);
 
@@ -1039,133 +1038,10 @@ next_item:
     return output;
 }
 
-/*PackingOutput HeuristicPackingGreedyResort::run(PackingInput input) {
-    PackingOutput best_output;
-    FT score = 0;
-    cout << "[c++] Running heuristic packing " << endl;
-    while(true) {
-        output = HeuristicPackingNOMIP::run(input);
-        auto tmp_input = outout.get_equiv_input();
-        output = HeuristicPackingNOMIP::run(tmp_input.fi);
-        FT s = output.get_score();
-        if(s > score) {
-            cout << "[c++] Improvement: " << (s - score).to_double() << endl;
-            score = s;
-            best_output = output;
-        } else {
-            break;
-        }
-    }
-    return output;
-}*/
-
-// WITH SIMPLICATION BUT IT DOES NOT WORK WELL
-/*
-PackingOutput HeuristicPackingNOMIP::run(PackingInput _input) {
-    auto input = _input;
-
-    cout << "[c++] Expanding items" << endl;
-    input.items = input.items.expand();
-
-    cout << "[c++] Sorting items" << endl;
-    MIPPackingHelpers helper (NULL, NULL);
-    vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items); // TODO: does this even sort non-increasingly?
-    input.items = permute(input.items, sorted_idxs);
-
-    PackingOutput output (_input);
-    auto add_item = [&](Item& item, Point p) {
-        assert(is_integer(p.x()));
-        assert(is_integer(p.y()));
-        Item new_item = item.move_ref_point(p);
-        // assert(is_completely_inside(input.container, Polygon_set(new_item.pol)));
-        output.add_item(new_item);
-    };
-    Polygon_set existing;
-    int number_of_included_items = 0;
-    fon(i, sz(input.items)) {
-        cout << "[c++] Iteration " << (i + 1) << " / " << sz(input.items) << endl;
-        auto& item = input.items[i];
-
-        cout << "[c++] Computing configuration space" << endl;
-        Polygon_set disallowed_space = get_complement(input.container);
-        disallowed_space.join(existing);
-        auto config_space = ConfigurationSpace(
-            disallowed_space,
-            item.pol,
-            item.get_reference_point()
-        ).space;
-
-        cout << "[c++] Finding lowest integral point" << endl;
-        vector<Point> vertices;
-        foe(pwh, to_polygon_vector(config_space)) {
-            foe(pol, pwh.outer_boundary()) vertices.push_back(pol);
-            // TODO: holes needed?
-        }
-        sort(vertices.begin(), vertices.end(), [](Point& a, Point& b) {
-            if(a.y() == b.y()) return a.x() < b.x();
-            return a.y() < b.y();
-        });
-        foe(v, vertices) {
-            foab(dy, -10, 5) foab(dx, -10, 5) { // TODO: probably don't need to check negative
-                Point p (floor_exact(v.x() + dx), floor_exact(v.y() + dy));
-                if(config_space.oriented_side(p) != CGAL::ON_NEGATIVE_SIDE) {
-                    cout << "[c++] Found lowest integral point: " << p << endl;
-                    add_item(item, p);
-                    debug("heyo1");
-                    existing.join(item.move_ref_point(p).pol);
-                    debug("heyo2");
-                    if(get_number_of_vertices(existing) > 50) {
-                        FT scale = 50000;
-                        while(get_number_of_vertices(existing) > 50) {
-                            cout << "scale: " << scale.to_double() << ", ";
-                            cout << "#vertices: " << get_number_of_vertices(existing) << endl;
-                            existing = SimplifyExpand::run(existing, scale);
-                            scale *= 1.1;
-                        }
-                    }
-                    debug("heyo3");
-                    foe(p, item.move_ref_point(p).pol) {
-                        Polygon box;
-                        {
-                            box.push_back(Point(p.x() - 1, p.y() - 1));
-                            box.push_back(Point(p.x() + 1, p.y() - 1));
-                            box.push_back(Point(p.x() + 1, p.y() + 1));
-                            box.push_back(Point(p.x() - 1, p.y() + 1));
-                        }
-                        existing.join(box);
-                    }
-                    debug("heyo4");
-                    // turn to integer polygon
-                    existing = SnapToGrid(existing).space;
-                    debug("yo1");
-                    if(!existing.is_empty()) {
-                        debug("outer boundary");
-                        debug(sz(to_polygon_vector(existing)));
-                        auto pol = to_polygon_vector(existing)[0];
-                        foe(p, pol.outer_boundary()) {
-                            debug(p);
-                        }
-                    }
-                    debug("yo2");
-                    number_of_included_items++;
-                    goto next_item;
-                }
-            }
-        }
-next_item:
-        cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
-    }
-
-    return output;
-}
-*/
-
-
 PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     auto input = _input;
     input.items = input.items.expand();
-    MIPPackingHelpers helper (NULL, NULL);
-    vector<int> sorted_idxs = helper.sort_by_value_over_area(input.items);
+    vector<int> sorted_idxs = input.items.sort_by_value_over_area();
     input.items = permute(input.items, sorted_idxs);
 
     auto container = get_single_polygon(input.container);
@@ -1316,33 +1192,6 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
 
 class HeuristicPackingHelpers {
 public:
-    FT get_average_area(ItemsContainer& items) {
-        FT sum = 0;
-        foe(item, items) sum += item.pol.area();
-        return sum / FT(sz(items));
-    }
-
-    FT get_width(Polygon_set& pol) {
-        auto bbox = get_bounding_box(pol);
-        return bbox[2].x() - bbox[0].x();
-    }
-
-    FT get_height(Polygon_set& pol) {
-        auto bbox = get_bounding_box(pol);
-        return bbox[2].y() - bbox[0].y();
-    }
-
-    FT area(Polygon_set& pset) {
-        FT res = 0;
-        foe(pwh, to_polygon_vector(pset)) {
-            res += pwh.outer_boundary().area();
-            foe(hole, pwh.holes()) {
-                assert(hole.area() < 0);
-                res += hole.area(); // hole area is negative
-            }
-        }
-        return res;
-    }
 
     vector<Polygon_set> overlay_grid(Polygon_set& container, FT square_size, bool random_offset=true) {
         Point start;
@@ -1463,7 +1312,7 @@ void HeuristicPackingRecursive::solve(
     cout << "[c++] Recursive solving at depth " << depth << endl;
     if(sz(items) == 0) return;
     vector<Polygon_set> sub_containers;
-    if(sz(items) > MAX_ITEMS_IN_PACKING && HeuristicPackingHelpers().area(container) / items.avg_area > FT(MAX_ITEMS_IN_PACKING) / FT(2)) { // SPACE FOR TOO MANY ITEMS
+    if(sz(items) > MAX_ITEMS_IN_PACKING && area(container) / items.avg_area > FT(MAX_ITEMS_IN_PACKING) / FT(2)) { // SPACE FOR TOO MANY ITEMS
         cout << "[c++] Splitting container" << endl;
         FT square_size = sqrt((FT(MAX_ITEMS_IN_PACKING) / FT(2) * items.avg_area).to_double()) - 2;
         assert(square_size >= 10);

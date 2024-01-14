@@ -12,9 +12,9 @@
 
 #include "io.h"
 
-using namespace std;
-
 typedef CGAL::Aff_transformation_2<K> Transformation;
+
+using namespace std;
 
 // TODO: duplicate implement in optimal_packing.cpp
 void assert_is_integer_polygon(Polygon& pol) {
@@ -185,20 +185,33 @@ pair<PackingInput,map<int,int>> PackingOutput::get_equiv_input() {
     }, mp);
 }
 
-    vector<int> sort_by_value_over_area(ItemsContainer items) {
-        vector<int> idxs (sz(items)); iota(idxs.begin(), idxs.end(), 0);
-        sort(idxs.begin(), idxs.end(), [&](int a, int b) {
-            return FT(items[a].value) / items[a].pol.area() > FT(items[b].value) / items[b].pol.area();
-        });
-        /*sort(items.begin(), items.end(), [](Item& a, Item& b) {
-            return FT(a.value) / a.pol.area() > FT(b.value) / b.pol.area();
-        });*/
-        return idxs;
+vector<int> ItemsContainer::sort_by_value_over_area() {
+    vector<int> idxs (sz(items)); iota(idxs.begin(), idxs.end(), 0);
+    sort(idxs.begin(), idxs.end(), [&](int a, int b) {
+        return FT(items[a].value) / items[a].pol.area() > FT(items[b].value) / items[b].pol.area();
+    });
+    /*sort(items.begin(), items.end(), [](Item& a, Item& b) {
+        return FT(a.value) / a.pol.area() > FT(b.value) / b.pol.area();
+    });*/
+    return idxs;
+}
+vector<int> ItemsContainer::sort_by_area() {
+    vector<int> idxs (sz(items)); iota(idxs.begin(), idxs.end(), 0);
+    sort(idxs.begin(), idxs.end(), [&](int a, int b) {
+        return items[a].pol.area() > items[b].pol.area();
+    });
+    return idxs;
+}
+
+FT ItemsContainer::get_average_area() {
+    FT sum = 0;
+    foe(item, items) sum += item.pol.area();
+    return sum / FT(sz(items));
+}
+
+ItemsContainer scale_items(ItemsContainer items, FT scale) {
+    foe(item, items) {
+        item.pol = scale_polygon(item.pol, scale);
     }
-    vector<int> sort_by_area(ItemsContainer items) {
-        vector<int> idxs (sz(items)); iota(idxs.begin(), idxs.end(), 0);
-        sort(idxs.begin(), idxs.end(), [&](int a, int b) {
-            return items[a].pol.area() > items[b].pol.area();
-        });
-        return idxs;
-    }
+    return items;
+}
