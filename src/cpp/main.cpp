@@ -9,6 +9,8 @@
 #include "lib/util/common.h"
 #include "lib/util/debug.h"
 
+#include "lib2/optimal_packing.h"
+
 namespace py = pybind11;
 
 using namespace std;
@@ -42,6 +44,14 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> cgal2output(
 
 OUT_TYPE dummy_algorithm(IN_TYPE);
 OUT_TYPE optimal_algorithm(IN_TYPE);
+
+OUT_TYPE heuristic_algorithm(IN_TYPE input) {
+    cout << "[c++] RUNNING HEURISTIC ALGORITHM" << endl;
+    // return HeuristicPackingFast().run(input);
+    // return HeuristicPackingNOMIP().run(input);
+    // return HeuristicPackingGrid().run(input);
+    return HeuristicPackingRecursive().run(input);
+}
 
 vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> main_algorithm(
     vector<pii> _container,

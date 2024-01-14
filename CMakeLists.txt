@@ -144,6 +144,7 @@ add_library(main${pybind11_suffix} SHARED src/cpp/main.cpp)
 target_link_libraries(
     main${pybind11_suffix}
     # dummy_algorithm
+    optimal_packing
     optimal_algorithm
     com CGAL::CGAL
     io
