@@ -80,6 +80,7 @@ public:
         AdvancedItemsContainer& items,
         PackingOutput& output,
         Polygon_set& packed,
+        FT original_area,
         int depth
     );
 };

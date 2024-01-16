@@ -327,9 +327,12 @@ void AdvancedItemsContainer::erase_item(int idx) {
 pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random_area(int k, FT area_up, FT area_lb) {
     ItemsContainer res;
     vector<int> indices;
+    int idx = 0;
     rep(5 * k) {
         if(sz(res) >= k) break;
-        int idx = rand() % sz(available_items);
+        idx++;
+        idx %= sz(available_items);
+        //int idx = rand() % sz(available_items);
         auto [value_over_area, item_idx] = *available_items.find_by_order(idx);
         if(item_areas[item_idx] > area_up || item_areas[item_idx] < area_lb) continue;
         erase_item(item_idx);
@@ -378,7 +381,7 @@ PackingOutput HeuristicPackingRecursive::run(PackingInput _input) {
     PackingOutput toutput (input);
     Polygon_set packed = get_complement(input.container);
     cout << "[c++] Recursive algorithm starting" << endl;
-    solve(input.container, items, toutput, packed, 0);
+    solve(input.container, items, toutput, packed, area(input.container), 0);
     cout << "[c++] Recursive algorithm finished" << endl;
     PackingOutput output (_input);
     foe(item, toutput.items) {
@@ -407,6 +410,7 @@ void HeuristicPackingRecursive::solve(
     AdvancedItemsContainer& items, // the items that are not yet packed
     PackingOutput& output, // the current packing
     Polygon_set& packed, // the current packed area
+    FT original_container_area,
     int depth
 ) {
     // TODO: we could set a cap on the depth of the recursion (ex. 10)
@@ -445,7 +449,7 @@ void HeuristicPackingRecursive::solve(
             auto allowed = sub_packed;
             allowed = get_complement(allowed);
             allowed.intersection(square);
-            solve(allowed, items, output, sub_packed, depth + 1);
+            solve(allowed, items, output, sub_packed, original_container_area, depth + 1);
             packed.join(sub_packed);
         }
         int sz_after = sz(items);
@@ -471,7 +475,7 @@ void HeuristicPackingRecursive::solve(
                 20
             ),
             area(container) * 0.9,
-            min(items.avg_area / FT(2), fits / MAX_ITEMS_IN_PACKING * items.avg_area / FT(2))
+            depth >= 1 ? 0 : min(items.avg_area / 5, fits / MAX_ITEMS_IN_PACKING * items.avg_area / 5)
         ); // , container_area
         debug("done sampling");
         PackingInput tinput {container, sampled_items};
@@ -536,7 +540,7 @@ void HeuristicPackingRecursive::solve(
             solve(sub_container, items, output, sub_packed, depth + 1);
             packed.join(sub_packed);
         } else {*/
-        solve(sub_container, items, output, packed, depth + 1);
+        solve(sub_container, items, output, packed, original_container_area, depth + 1);
         //}
     }
 }
