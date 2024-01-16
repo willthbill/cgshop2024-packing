@@ -63,6 +63,7 @@ public:
     int size(); 
     void add_item(int idx); 
     void erase_item(int idx); 
+    std::pair<ItemsContainer,std::vector<int>> extract_items_random_area(int k, FT area_up, FT area_lb); 
     std::pair<ItemsContainer,std::vector<int>> extract_items_random(int k); 
 };
 

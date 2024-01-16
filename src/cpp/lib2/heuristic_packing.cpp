@@ -324,13 +324,14 @@ void AdvancedItemsContainer::erase_item(int idx) {
     else avg_area = (avg_area * FT(size()) - item_areas[idx]) / FT(size() - 1);
     available_items.erase({sorting_metric(idx), idx});
 }
-/*pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random_area(int k, FT area_cap) {
+pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random_area(int k, FT area_up, FT area_lb) {
     ItemsContainer res;
     vector<int> indices;
     rep(5 * k) {
+        if(sz(res) >= k) break;
         int idx = rand() % sz(available_items);
         auto [value_over_area, item_idx] = *available_items.find_by_order(idx);
-        if(item_areas[item_idx] > area_cap) continue;
+        if(item_areas[item_idx] > area_up || item_areas[item_idx] < area_lb) continue;
         erase_item(item_idx);
         auto& item = items[item_idx];
         indices.push_back(item_idx);
@@ -338,8 +339,9 @@ void AdvancedItemsContainer::erase_item(int idx) {
         Item new_item {item.value, item.quantity, item.pol, sz(res), Vector(0,0)};
         res.add_item(new_item);
     }
+    debug("Sample ratio: ", (double)sz(res) / (double)k);
     return {res, indices};
-}*/
+}
 pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(int k) { // TODO: do better than random
     ItemsContainer res;
     vector<int> indices;
@@ -407,10 +409,7 @@ void HeuristicPackingRecursive::solve(
     Polygon_set& packed, // the current packed area
     int depth
 ) {
-    // TODO: GO FROM HERE: make the squares overlap slightly !!!!!!!!!!!!!!!!!!!!!!!!!
-    // TODO: optimization, before passing packed to a subproblem reduce it by intersection with the minkowsky sum of container and 3*unit square
     // TODO: we could set a cap on the depth of the recursion (ex. 10)
-    // TODO: precompute areas
     // TODO: there is a lot of copying of polygons happening (ex. items)
 
     // If not items left, return. This should probably never happen
@@ -431,7 +430,7 @@ void HeuristicPackingRecursive::solve(
         auto squares = HeuristicPackingHelpers().overlay_grid(
             container,
             square_size,
-            depth != 0, // choose random offset when depth is not 0
+            depth != 0, // choose random offset when depth is not 0. should happen rarely
             true
         );
         cout << "[c++] Splitting container at depth " << depth << " into " << sz(squares) << " squares" << endl;
@@ -460,13 +459,19 @@ void HeuristicPackingRecursive::solve(
             // YES do that
         // TODO: only consider items that fit when computing avg_area i guess, when sampling is updated to only include items with small enough area
 
-        // Pack container directory
-        auto [sampled_items, indices] = items.extract_items_random(
-            min(
-                min(sz(items), MAX_ITEMS_IN_PACKING),
-                // (int)(1e9)
-                (int)((2 * area(container) / items.avg_area).to_double()) + 2 // TODO: big optimization but also a compromise on quality
-            )
+        // Pack container directly
+        FT fits = area(container) / items.avg_area;
+        auto [sampled_items, indices] = items.extract_items_random_area(
+            max(
+                min(
+                    min(sz(items), MAX_ITEMS_IN_PACKING),
+                    // (int)(1e9)
+                    (int)((2 * fits).to_double()) + 2 // TODO: big optimization but also a compromise on quality
+                ),
+                20
+            ),
+            area(container) * 0.9,
+            min(items.avg_area / FT(2), fits / MAX_ITEMS_IN_PACKING * items.avg_area / FT(2))
         ); // , container_area
         debug("done sampling");
         PackingInput tinput {container, sampled_items};
