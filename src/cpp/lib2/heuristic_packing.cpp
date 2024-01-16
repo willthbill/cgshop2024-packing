@@ -455,12 +455,14 @@ void HeuristicPackingRecursive::solve(
             FT prev_score = output.get_score();
 
             // Remove items that were packed
+            Polygon_set subpacked;
             foe(item, toutput.items) {
-                packed.join(expand(item.pol, 3)); // TODO: add 1.5 square around item.pol
+                subpacked.join(expand(item.pol, 3)); // TODO: add 1.5 square around item.pol
                 Item new_item {item.value, 1, item.pol, indices[item.idx], Vector(0,0)};
                 output.add_item(new_item);
                 unused_indices.erase(indices[item.idx]);
             }
+            packed.join(subpacked);
 
             FT new_score = output.get_score();
             if(prev_score > 0) cout << "[c++] Score improvement: " << new_score.to_double() / prev_score.to_double() * 100 - 100 << "%" << " at depth " << depth << endl;
@@ -560,3 +562,10 @@ void HeuristicPackingRecursive::solve(
 // TODO: maybe see if there are common factors (or something like that) on each side so we can make numbers smaller
 // TODO: optimize by drawing triangle around instead of square???
 // TODO: actually calculate bounds (inf, biginf, ...)
+
+/*
+MEETING
+- sampling strategies
+- overlapping squares (problem with holes in grid)
+- optimization (problem is minkowski sum)
+*/
