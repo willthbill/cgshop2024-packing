@@ -249,7 +249,9 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
 class HeuristicPackingHelpers {
 public:
 
-    vector<Polygon_set> overlay_grid(Polygon_set& container, FT square_size, bool random_offset=true) {
+    vector<Polygon_set> overlay_grid(Polygon_set& container, FT square_size, bool random_offset=true, bool overlap=false) {
+        FT overlap_factor = FT(0.2);
+        if(overlap) square_size *= FT(1) - overlap_factor;
         Point start;
         {
             auto bbox = get_int_bounding_box(container);
@@ -271,12 +273,13 @@ public:
             fon(_j, number_of_steps_y) {
                 FT i = _i;
                 FT j = _j;
+                FT sub = overlap ? overlap_factor * square_size : 0;
                 Polygon square;
                 {
-                    square.push_back(Point(start.x() + i * square_size, start.y() + j * square_size));
-                    square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + j * square_size));
+                    square.push_back(Point(start.x() + i * square_size - sub, start.y() + j * square_size - sub));
+                    square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + j * square_size - sub));
                     square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + (j + FT(1)) * square_size));
-                    square.push_back(Point(start.x() + i * square_size, start.y() + (j + FT(1)) * square_size));
+                    square.push_back(Point(start.x() + i * square_size - sub, start.y() + (j + FT(1)) * square_size));
                 }
                 Polygon_set allowed_space (container);
                 allowed_space.intersection(square);
@@ -321,7 +324,7 @@ void AdvancedItemsContainer::erase_item(int idx) {
     else avg_area = (avg_area * FT(size()) - item_areas[idx]) / FT(size() - 1);
     available_items.erase({sorting_metric(idx), idx});
 }
-pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random_area(int k, FT area_cap) {
+/*pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random_area(int k, FT area_cap) {
     ItemsContainer res;
     vector<int> indices;
     rep(5 * k) {
@@ -336,7 +339,7 @@ pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random_ar
         res.add_item(new_item);
     }
     return {res, indices};
-}
+}*/
 pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(int k) { // TODO: do better than random
     ItemsContainer res;
     vector<int> indices;
@@ -356,7 +359,7 @@ pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(in
 ///////////////////////
 
 ////// PARAMS ///////
-const int MAX_ITEMS_IN_PACKING = 200;
+const int MAX_ITEMS_IN_PACKING = 1000;
 ///////////////////////
 
 
@@ -425,7 +428,12 @@ void HeuristicPackingRecursive::solve(
         // Split container into squares
         FT square_size = sqrt((FT(MAX_ITEMS_IN_PACKING) / FT(2.1) * items.avg_area).to_double()) - 2;
         assert(square_size >= 10);
-        auto squares = HeuristicPackingHelpers().overlay_grid(container, square_size, depth != 0); // choose random offset when depth is not 0
+        auto squares = HeuristicPackingHelpers().overlay_grid(
+            container,
+            square_size,
+            depth != 0, // choose random offset when depth is not 0
+            true
+        );
         cout << "[c++] Splitting container at depth " << depth << " into " << sz(squares) << " squares" << endl;
 
         // Solve each square recursively
@@ -434,13 +442,12 @@ void HeuristicPackingRecursive::solve(
             debug(area(square).to_double() / area(container).to_double());
         }*/
         foe(square, squares) {
-            if(depth == 0) {
-                auto sub_packed = packed; sub_packed.intersection(square);
-                solve(square, items, output, sub_packed, depth + 1);
-                packed.join(sub_packed);
-            } else {
-                solve(square, items, output, packed, depth + 1);
-            }
+            auto sub_packed = packed; sub_packed.intersection(square);
+            auto allowed = sub_packed;
+            allowed = get_complement(allowed);
+            allowed.intersection(square);
+            solve(allowed, items, output, sub_packed, depth + 1);
+            packed.join(sub_packed);
         }
         int sz_after = sz(items);
         ASSERT(sz_after <= sz_before,"size not smaller");
@@ -576,6 +583,7 @@ void HeuristicPackingRecursive::solve(
     - Make repacking spaces overlap
     - Somehow remove already packed items and replace with not packed items
     - Repack around holes
+    - Try this?: https://github.com/tamasmeszaros/libnest2d
 */
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
