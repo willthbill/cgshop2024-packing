@@ -63,6 +63,17 @@ public:
     int size(); 
     void add_item(int idx); 
     void erase_item(int idx); 
+
+    std::deque<std::pair<std::pair<FT,FT>,ordered_set_rev<std::pair<FT,int>>>> buckets;
+    FT total_area_packed;
+    int get_bucket_for_area_container(FT area);
+    std::vector<int> get_buckets_for_area_item(FT item_area);
+    std::pair<ItemsContainer,std::vector<int>> extract_items_bucket_sampling(
+        int k,
+        FT area,
+        FT original_container_area
+    );
+
     std::pair<ItemsContainer,std::vector<int>> extract_items_random_area(int k, FT area_up, FT area_lb); 
     std::pair<ItemsContainer,std::vector<int>> extract_items_random(int k); 
 };

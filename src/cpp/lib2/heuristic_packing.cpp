@@ -304,12 +304,63 @@ AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
     fon(i, sz(items)) assert(items[i].idx == i);
     foe(item, items) item_areas.push_back(item.pol.area());
     avg_area = 0;
+    auto tbuckets = buckets;
+    {
+        double f = 2; // TODO: test different
+        double a = f;
+        double pa = 0;
+        while(pa <= 1e30) {
+            buckets.push_back({{FT(pa - 0.01), FT(a + 0.01)}, ordered_set_rev<pair<FT,int>>()});
+            pa = a;
+            a *= f;
+        }
+    }
+    total_area_packed = accumulate(item_areas.begin(), item_areas.end(), FT(0));
     fon(i, sz(items)) {
         add_item(i);
     }
+
+    ASSERT(total_area_packed == FT(0),"");
+
+    // Just to remove unused buckets
+    foe(bucket, buckets) {
+        if(sz(bucket.se)) {
+            tbuckets.push_back(bucket);
+        }
+    }
+    buckets = tbuckets;
 }
 int AdvancedItemsContainer::size() {
     return sz(available_items);
+}
+/*int AdvancedItemsContainer::bucket_size(FT area) {
+    return sz(buckets[get_bucket_for_area_container(area)].se);
+}*/
+int AdvancedItemsContainer::get_bucket_for_area_container(FT area) {
+    int bidx = -1;
+    fon(i, sz(buckets)) {
+        auto& a = buckets[i].fi.fi;
+        auto& b = buckets[i].fi.se;
+        /*if(a <= area && area <= b) {
+            bidx = i;
+            break;
+        } else */if(b <= area) {
+            bidx = i;
+        }
+    }
+    return bidx;
+}
+vector<int> AdvancedItemsContainer::get_buckets_for_area_item(FT item_area) {
+    FT min_area_container = item_area * 5;
+    FT max_area_container = item_area * FT(10000000000000);
+    int min_bidx = get_bucket_for_area_container(min_area_container);
+    int max_bidx = get_bucket_for_area_container(max_area_container);
+    debug(min_bidx, max_bidx);
+    vector<int> res;
+    for(int i = min_bidx; i <= max_bidx; i++) {
+        res.push_back(i);
+    }
+    return res;
 }
 void AdvancedItemsContainer::add_item(int idx) {
     avg_area = (avg_area * FT(size()) + item_areas[idx]) / FT(size() + 1);
@@ -318,11 +369,79 @@ void AdvancedItemsContainer::add_item(int idx) {
         cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ITEM ALREADY IN AVAILABLE ITEMS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
     }
     available_items.insert(e);
+
+    total_area_packed -= item_areas[idx];
+    foe(bidx, get_buckets_for_area_item(item_areas[idx])) {
+        auto& bucket = buckets[bidx].se;
+        bucket.insert(e);
+    }
 }
 void AdvancedItemsContainer::erase_item(int idx) {
     if(size() == 1) avg_area = 0;
     else avg_area = (avg_area * FT(size()) - item_areas[idx]) / FT(size() - 1);
-    available_items.erase({sorting_metric(idx), idx});
+    pair<FT,int> e = {sorting_metric(idx), idx};
+    available_items.erase(e);
+
+    total_area_packed += item_areas[idx];
+    foe(bidx, get_buckets_for_area_item(item_areas[idx])) {
+        auto& bucket = buckets[bidx].se;
+        if(bucket.find(e) != bucket.end()) {
+            bucket.erase(e);
+        }
+    }
+}
+pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_bucket_sampling(
+    int k,
+    FT area,
+    FT original_container_area
+) {
+    // TODO: put in buckets relative to the size of the largest item and the smallest item
+        // save largest area item. then the relation beetween the current item and the largest is the dynamic factor, F
+        // so F * item_area == largest_area
+        // the smallest 20% should be available when container area is less than 10 * largest_area
+        // item_area * max_factor == 10 * largest_area
+        // max_factor == 10 * largest_area / item_area = 10 * F
+        // min_factor = 1.5
+
+        // Smallest item should be available when container area is less than 10 * largest_area
+        // smallest_area * max_factor == 10 * largest_area
+        // => max_factor = 10 * largest_area / smallest_area = SOME_CONSTANT
+        // make sure to take into account that these constants may have wried values. use min/max trick
+        // Probably better to take average area of the smallest 10% of items or something
+            // but what about super duper small items then? maybe placed in repacking?
+    int orig_k = k;
+    FT total_area_left = original_container_area - total_area_packed;
+    ItemsContainer res;
+    vector<int> indices;
+    int skip = max(1, (int)((total_area_left / area).to_double() / 1.5)); // TODO: should take into account that bucket does not have all items, but it is probably fine
+    int bidx = get_bucket_for_area_container(area);
+    while(k && bidx >= 0) {
+        vector<int> taken;
+        int idx = 0;
+        while(k && sz(buckets[bidx].se)) {
+            auto [value_over_area, item_idx] = *buckets[bidx].se.find_by_order(idx);
+            taken.push_back(item_idx);
+
+            auto& item = items[item_idx];
+            indices.push_back(item_idx);
+            assert(item.quantity == 1);
+            Item new_item {item.value, item.quantity, item.pol, sz(res), Vector(0,0)};
+            res.add_item(new_item);
+            k--;
+
+            idx += skip;
+            idx %= sz(buckets[bidx].se);
+            if(idx >= sz(buckets[bidx].se)) {
+                idx = 0;
+                foe(e, taken) erase_item(e);
+                taken = {};
+            }
+        }
+        foe(e, taken) erase_item(e);
+        bidx--;
+    }
+    // debug("Sample ratio: ", (double)sz(res) / (double)orig_k);
+    return {res, indices};
 }
 pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random_area(int k, FT area_up, FT area_lb) {
     ItemsContainer res;
@@ -342,7 +461,7 @@ pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random_ar
         Item new_item {item.value, item.quantity, item.pol, sz(res), Vector(0,0)};
         res.add_item(new_item);
     }
-    debug("Sample ratio: ", (double)sz(res) / (double)k);
+    // debug("Sample ratio: ", (double)sz(res) / (double)k);
     return {res, indices};
 }
 pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(int k) { // TODO: do better than random
@@ -425,7 +544,7 @@ void HeuristicPackingRecursive::solve(
     //debug(area(container).to_double());
     //debug(items.avg_area.to_double());
     // TODO: area might be small because of psets, but completely high (very high)
-    // TODO: only consider items that are small enough to fit in the container
+    // TODO: only consider items that are small enough to fit in the container (use buckets)
     if(sz(items) > MAX_ITEMS_IN_PACKING && area(container) / items.avg_area > FT(MAX_ITEMS_IN_PACKING) / FT(1.9)) { // SPACE FOR TOO MANY ITEMS
 
         // Split container into squares
@@ -465,22 +584,28 @@ void HeuristicPackingRecursive::solve(
 
         // Pack container directly
         FT fits = area(container) / items.avg_area;
-        auto [sampled_items, indices] = items.extract_items_random_area(
-            max(
-                min(
-                    min(sz(items), MAX_ITEMS_IN_PACKING),
-                    // (int)(1e9)
-                    (int)((2 * fits).to_double()) + 2 // TODO: big optimization but also a compromise on quality
-                ),
-                20
+        int to_sample = max(
+            min(
+                min(sz(items), MAX_ITEMS_IN_PACKING),
+                (int)((2 * fits).to_double()) + 2 // TODO: big optimization but also a compromise on quality
             ),
+            20
+        );
+        auto [sampled_items, indices] = items.extract_items_bucket_sampling(
+            to_sample,
+            area(container),
+            original_container_area
+        );
+        foe(item, sampled_items) {
+            ASSERT(item.pol.area() <= area(container),"");
+        }
+        /*auto [sampled_items, indices] = items.extract_items_random_area(
+            to_sample,
             area(container) * 0.9,
             depth >= 1 ? 0 : min(items.avg_area / 5, fits / MAX_ITEMS_IN_PACKING * items.avg_area / 5)
-        ); // , container_area
-        debug("done sampling");
+        ); // , container_area*/
         PackingInput tinput {container, sampled_items};
         PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false);
-        debug("done solving");
 
         // Deal with the result
         set<int> unused_indices;
