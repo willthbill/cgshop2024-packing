@@ -57,6 +57,7 @@ public:
     FT avg_area;
     ordered_set_rev<std::pair<FT,int>> available_items;
     ItemsContainer items;
+    std::vector<FT> item_areas;
     FT sorting_metric(int idx);
     AdvancedItemsContainer(ItemsContainer& items); 
     int size(); 

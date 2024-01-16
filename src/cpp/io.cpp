@@ -79,12 +79,12 @@ Item& ItemsContainer::operator[](std::size_t i) {
 
 void PackingOutput::validate_item(Item item) {
     assert_is_integer_polygon(item.pol);
-    ASSERT(item_count[item.idx] < input.items[item.idx].quantity, to_string(item_count[item.idx]) + " " + to_string(input.items[item.idx].quantity));
-    ASSERT(item.quantity == 1ll, "in a result all quanities must be 1");
-    ASSERT(input.items[item.idx].value == item.value,"");
-    ASSERT(input.items[item.idx].idx == item.idx,"");
+    assert(item_count[item.idx] < input.items[item.idx].quantity);//, to_string(item_count[item.idx]) + " " + to_string(input.items[item.idx].quantity));
+    assert(item.quantity == 1ll);//, "in a result all quanities must be 1");
+    assert(input.items[item.idx].value == item.value);//,"");
+    assert(input.items[item.idx].idx == item.idx);//,"");
     // ASSERT(is_polygon_inside_polygon(item.pol, input.container), "translated item " << item.idx << " is not inside container");
-    get_translation(item);
+    // get_translation(item);
 }
 
 PackingOutput::PackingOutput(PackingInput _input) {

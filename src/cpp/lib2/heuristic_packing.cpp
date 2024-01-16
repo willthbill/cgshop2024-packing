@@ -293,12 +293,13 @@ public:
 
 ////// ADVANCED ITEMS CONTAINER ///////
 FT AdvancedItemsContainer::sorting_metric(int idx) {
-    return items[idx].value / items[idx].pol.area();
+    return items[idx].value / item_areas[idx];
 }
 AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
     items = _items;
     foe(item, items) assert(item.quantity == 1);
     fon(i, sz(items)) assert(items[i].idx == i);
+    foe(item, items) item_areas.push_back(item.pol.area());
     avg_area = 0;
     fon(i, sz(items)) {
         add_item(i);
@@ -308,7 +309,7 @@ int AdvancedItemsContainer::size() {
     return sz(available_items);
 }
 void AdvancedItemsContainer::add_item(int idx) {
-    avg_area = (avg_area * FT(size()) + items[idx].pol.area()) / FT(size() + 1);
+    avg_area = (avg_area * FT(size()) + item_areas[idx]) / FT(size() + 1);
     pair<FT,int> e = {sorting_metric(idx), idx};
     if(available_items.find(e) != available_items.end()) {
         cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ITEM ALREADY IN AVAILABLE ITEMS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
@@ -317,8 +318,24 @@ void AdvancedItemsContainer::add_item(int idx) {
 }
 void AdvancedItemsContainer::erase_item(int idx) {
     if(size() == 1) avg_area = 0;
-    else avg_area = (avg_area * FT(size()) - items[idx].pol.area()) / FT(size() - 1);
+    else avg_area = (avg_area * FT(size()) - item_areas[idx]) / FT(size() - 1);
     available_items.erase({sorting_metric(idx), idx});
+}
+pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random_area(int k, FT area_cap) {
+    ItemsContainer res;
+    vector<int> indices;
+    rep(5 * k) {
+        int idx = rand() % sz(available_items);
+        auto [value_over_area, item_idx] = *available_items.find_by_order(idx);
+        if(item_areas[item_idx] > area_cap) continue;
+        erase_item(item_idx);
+        auto& item = items[item_idx];
+        indices.push_back(item_idx);
+        assert(item.quantity == 1);
+        Item new_item {item.value, item.quantity, item.pol, sz(res), Vector(0,0)};
+        res.add_item(new_item);
+    }
+    return {res, indices};
 }
 pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(int k) { // TODO: do better than random
     ItemsContainer res;
@@ -390,6 +407,8 @@ void HeuristicPackingRecursive::solve(
     // TODO: GO FROM HERE: make the squares overlap slightly !!!!!!!!!!!!!!!!!!!!!!!!!
     // TODO: optimization, before passing packed to a subproblem reduce it by intersection with the minkowsky sum of container and 3*unit square
     // TODO: we could set a cap on the depth of the recursion (ex. 10)
+    // TODO: precompute areas
+    // TODO: there is a lot of copying of polygons happening (ex. items)
 
     // If not items left, return. This should probably never happen
     if(sz(items) == 0) {
@@ -400,6 +419,7 @@ void HeuristicPackingRecursive::solve(
     //debug(area(container).to_double());
     //debug(items.avg_area.to_double());
     // TODO: area might be small because of psets, but completely high (very high)
+    // TODO: only consider items that are small enough to fit in the container
     if(sz(items) > MAX_ITEMS_IN_PACKING && area(container) / items.avg_area > FT(MAX_ITEMS_IN_PACKING) / FT(1.9)) { // SPACE FOR TOO MANY ITEMS
 
         // Split container into squares
@@ -440,7 +460,7 @@ void HeuristicPackingRecursive::solve(
                 // (int)(1e9)
                 (int)((2 * area(container) / items.avg_area).to_double()) + 2 // TODO: big optimization but also a compromise on quality
             )
-        ); // , container.area()
+        ); // , container_area
         debug("done sampling");
         PackingInput tinput {container, sampled_items};
         PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false);
