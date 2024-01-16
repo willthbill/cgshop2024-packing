@@ -7,6 +7,7 @@
 #include "lib/util/geometry_utils.h"
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
+#include "lib/util/debug.h"
 
 using namespace std;
 
@@ -189,7 +190,7 @@ FT area(Polygon_set& pset) {
     foe(pwh, to_polygon_vector(pset)) {
         res += pwh.outer_boundary().area();
         foe(hole, pwh.holes()) {
-            assert(hole.area() < 0);
+            ASSERT(hole.area() < 0,"not negative hole area");
             res += hole.area(); // hole area is negative
         }
     }

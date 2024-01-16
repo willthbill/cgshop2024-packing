@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
 #include <CGAL/Aff_transformation_2.h>
 #include <CGAL/Boolean_set_operations_2.h>
+#include <CGAL/minkowski_sum_2.h>
 
 #include "lib2/simplification.h"
 #include "lib2/convex_cover.cpp"
@@ -76,7 +77,7 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int so
                     if(config_space.oriented_side(p) != CGAL::ON_NEGATIVE_SIDE) {
                         if(print) cout << "[c++] Found lowest integral point: " << p << endl;
                         add_item(item, p);
-                        existing.join(item.move_ref_point(p).pol);
+                        existing.join(item.move_ref_point(p).pol); // TODO: just insert instead of join?
                         // turn to integer polygon
                         // existing = SnapToGrid(existing).space;
                         number_of_included_items++;
@@ -346,15 +347,16 @@ const int MAX_ITEMS_IN_PACKING = 200;
 PackingOutput HeuristicPackingRecursive::run(PackingInput _input) {
     auto input = _input;
     input.items = input.items.expand();
-    fon(i, sz(input.items)) input.items[i].idx = i;
     vector<int> item_indices;
     fon(i, sz(input.items)) {
         item_indices.push_back(input.items[i].idx);
     }
+    fon(i, sz(input.items)) input.items[i].idx = i;
     AdvancedItemsContainer items (input.items);
     PackingOutput toutput (input);
+    Polygon_set packed = get_complement(input.container);
     cout << "[c++] Recursive algorithm starting" << endl;
-    solve(input.container, items, toutput, 0);
+    solve(input.container, items, toutput, packed, 0);
     cout << "[c++] Recursive algorithm finished" << endl;
     PackingOutput output (_input);
     foe(item, toutput.items) {
@@ -364,67 +366,145 @@ PackingOutput HeuristicPackingRecursive::run(PackingInput _input) {
     return output;
 }
 
+
+Polygon_with_holes expand(Polygon& pol, FT scale) {
+    Polygon square;
+    FT factor = 0.5;
+    {
+        square.push_back(Point(-factor * scale,-scale * factor));
+        square.push_back(Point(factor * scale,-scale * factor));
+        square.push_back(Point(factor * scale,scale * factor));
+        square.push_back(Point(-factor * scale,scale * factor));
+    }
+    auto sum = CGAL::minkowski_sum_2(pol, square);
+    return sum;
+}
+
 void HeuristicPackingRecursive::solve(
-    Polygon_set& container,
-    AdvancedItemsContainer& items,
-    PackingOutput& output,
+    Polygon_set& container, // guaranteed that it is free
+    AdvancedItemsContainer& items, // the items that are not yet packed
+    PackingOutput& output, // the current packing
+    Polygon_set& packed, // the current packed area
     int depth
 ) {
-    // cout << "[c++] Recursive solving at depth " << depth << endl;
+    // TODO: GO FROM HERE: make the squares overlap slightly !!!!!!!!!!!!!!!!!!!!!!!!!
+    // TODO: optimization, before passing packed to a subproblem reduce it by intersection with the minkowsky sum of container and 3*unit square
+    // TODO: we could set a cap on the depth of the recursion (ex. 10)
+
+    // If not items left, return. This should probably never happen
     if(sz(items) == 0) {
         // cout << "[c++] No items left" << endl;
         return;
     }
-    vector<Polygon_set> sub_containers;
+    cout << "[c++] Recursive solving at depth " << depth << endl;
+    //debug(area(container).to_double());
+    //debug(items.avg_area.to_double());
     // TODO: area might be small because of psets, but completely high (very high)
     if(sz(items) > MAX_ITEMS_IN_PACKING && area(container) / items.avg_area > FT(MAX_ITEMS_IN_PACKING) / FT(1.9)) { // SPACE FOR TOO MANY ITEMS
-        cout << "[c++] Splitting container at depth " << depth << endl;
+
+        // Split container into squares
         FT square_size = sqrt((FT(MAX_ITEMS_IN_PACKING) / FT(2.1) * items.avg_area).to_double()) - 2;
         assert(square_size >= 10);
-        sub_containers = HeuristicPackingHelpers().overlay_grid(container, square_size, depth != 0); // choose random offset when depth is not 0
+        auto squares = HeuristicPackingHelpers().overlay_grid(container, square_size, depth != 0); // choose random offset when depth is not 0
+        cout << "[c++] Splitting container at depth " << depth << " into " << sz(squares) << " squares" << endl;
+
+        // Solve each square recursively
+        int sz_before = sz(items);
+        /*foe(square, squares) {
+            debug(area(square).to_double() / area(container).to_double());
+        }*/
+        foe(square, squares) {
+            if(depth == 0) {
+                auto sub_packed = packed; sub_packed.intersection(square);
+                solve(square, items, output, sub_packed, depth + 1);
+                packed.join(sub_packed);
+            } else {
+                solve(square, items, output, packed, depth + 1);
+            }
+        }
+        int sz_after = sz(items);
+        ASSERT(sz_after <= sz_before,"size not smaller");
+        if(sz_before == sz_after) {
+            return;
+        }
     } else {
         //cout << "[c++] Packing container directly" << endl;
         // TODO: we could samples just 2 * container.area() / items.avg_area items
             // YES do that
         // TODO: only consider items that fit when computing avg_area i guess, when sampling is updated to only include items with small enough area
-        auto [sampled_items, indices] = items.extract_items_random(min(sz(items), MAX_ITEMS_IN_PACKING)); // , container.area()
+
+        // Pack container directory
+        auto [sampled_items, indices] = items.extract_items_random(
+            min(
+                min(sz(items), MAX_ITEMS_IN_PACKING),
+                // (int)(1e9)
+                (int)((2 * area(container) / items.avg_area).to_double()) + 2 // TODO: big optimization but also a compromise on quality
+            )
+        ); // , container.area()
+        debug("done sampling");
         PackingInput tinput {container, sampled_items};
-        debug("yo1");
         PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false);
-        debug("yo2");
+        debug("done solving");
+
+        // Deal with the result
         set<int> unused_indices;
+        foe(idx, indices) {
+            unused_indices.insert(idx);
+        }
         if(sz(toutput.items)) {
             FT prev_score = output.get_score();
-            foe(idx, indices) unused_indices.insert(idx);
-            Polygon_set packed = get_complement(container);
+
+            // Remove items that were packed
             foe(item, toutput.items) {
-                packed.join(item.pol); // TODO: add 1.5 square around item.pol
+                packed.join(expand(item.pol, 3)); // TODO: add 1.5 square around item.pol
                 Item new_item {item.value, 1, item.pol, indices[item.idx], Vector(0,0)};
                 output.add_item(new_item);
                 unused_indices.erase(indices[item.idx]);
             }
-            Polygon_set empty_space = get_complement(packed);
-            // sub_containers.push_back(empty_space); // TODO: this is probably better in some cases
-            foe(pwh, to_polygon_vector(empty_space)) {
-                sub_containers.push_back(Polygon_set(pwh));
-            }
+
             FT new_score = output.get_score();
             if(prev_score > 0) cout << "[c++] Score improvement: " << new_score.to_double() / prev_score.to_double() * 100 - 100 << "%" << " at depth " << depth << endl;
             else cout << "[c++] First score " << new_score.to_double() << " at depth " << depth << endl;
-        } else {
-            foe(idx, indices) {
-                unused_indices.insert(idx);
-            }
         }
+
+        // Add back the items that were not packed
         foe(idx, unused_indices) {
             items.add_item(idx);
         }
+
+        // Nothing was packed so we assume it is impossible to pack anything
+        if(sz(toutput.items) == 0) {
+            return;
+        }
     }
-    // cout << "[c++] Number of sub-containers: " << sz(sub_containers) << endl;
+
+    // Get empty space within the container
+    vector<Polygon_set> sub_containers;
+    Polygon_set empty_space = container;
+    empty_space.intersection(packed);
+    empty_space = get_complement(empty_space);
+    empty_space.intersection(container);
+    /*Polygon_set empty_space = container;
+    empty_space.intersection(get_complement(packed));*/
+
+    // Get subcontainers
+    // sub_containers.push_back(empty_space); // TODO: this is probably better in some cases
+        // TODO: If it is not going to be split into squares then this is better probably. but also slower.
+    foe(pwh, to_polygon_vector(empty_space)) {
+        sub_containers.push_back(Polygon_set(pwh));
+    }
+
+    // Solve subcontainers recursively
+    cout << "[c++] Number of sub-containers " << sz(sub_containers) << " at depth " << depth << endl;
     foe(sub_container, sub_containers) {
-        solve(sub_container, items, output, depth + 1);
+        /*if(false && depth < 3) {
+            auto sub_packed = packed; sub_packed.intersection(sub_container);
+            solve(sub_container, items, output, sub_packed, depth + 1);
+            packed.join(sub_packed);
+        } else {*/
+        solve(sub_container, items, output, packed, depth + 1);
+        //}
     }
-    // TODO: we are not filling holes after packing squares!!!!!
 }
 ///////////////////////
 

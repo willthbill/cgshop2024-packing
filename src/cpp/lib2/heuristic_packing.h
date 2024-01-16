@@ -77,6 +77,7 @@ public:
         Polygon_set& container,
         AdvancedItemsContainer& items,
         PackingOutput& output,
+        Polygon_set& packed,
         int depth
     );
 };
