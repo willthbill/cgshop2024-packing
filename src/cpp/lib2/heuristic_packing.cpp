@@ -563,7 +563,7 @@ pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(in
 ///////////////////////
 
 ////// PARAMS ///////
-const int MAX_ITEMS_IN_PACKING = 1000;
+const int MAX_ITEMS_IN_PACKING = 1500;
 ///////////////////////
 
 
@@ -660,7 +660,7 @@ void HeuristicPackingRecursive::solve(
             auto allowed = sub_packed;
             allowed = get_complement(allowed);
             allowed.intersection(square);
-            solve(allowed, items, output, sub_packed, original_container_area, depth + 1);
+            solve(allowed, items, output, sub_packed, original_container_area, depth); // not +1 on depth
             packed.join(sub_packed);
         }
         int sz_after = sz(items);
@@ -679,13 +679,13 @@ void HeuristicPackingRecursive::solve(
         int to_sample = max(
             min(
                 min(sz(items), MAX_ITEMS_IN_PACKING),
-                (int)((2 * fits).to_double()) + 2 // TODO: big optimization but also a compromise on quality
+                depth == 0 ? ((int)(1e9)) : ((int)((3 * fits).to_double()) + 2) // TODO: big optimization but also a compromise on quality
             ),
-            20
+            30
         );
         auto [sampled_items, indices] = items.extract_items_bucket_sampling(
             to_sample,
-            get_area_of_largest_convex_cover_piece(container), //area(container),
+            get_area_of_largest_convex_cover_piece(container), //area(container), // TODO: try with normal area as well
             original_container_area
         );
         /*auto [sampled_items, indices] = items.extract_items_median_sampling(
@@ -694,11 +694,11 @@ void HeuristicPackingRecursive::solve(
             original_container_area,
             area(container)
         );*/
-        if(sz(sampled_items)) {
+        /*if(sz(sampled_items)) {
             debug(sz(sampled_items), sampled_items.get_average_area().to_double(), depth);
         } else {
             debug("no items", depth);
-        }
+        }*/
         /*foe(item, sampled_items) {
             ASSERT(item.pol.area() <= area(container),"");
         }*/
@@ -821,6 +821,8 @@ void HeuristicPackingRecursive::solve(
     - Somehow remove already packed items and replace with not packed items
     - Repack around holes
     - Try this?: https://github.com/tamasmeszaros/libnest2d
+    - Use different parameters for different instances
+    - Try running with the median method as well
 */
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
