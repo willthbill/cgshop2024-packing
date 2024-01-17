@@ -64,8 +64,18 @@ public:
     void add_item(int idx); 
     void erase_item(int idx); 
 
+    std::pair<ItemsContainer,std::vector<int>> extract_items_median_sampling(
+        int k,
+        int depth,
+        FT original_container_area,
+        FT area
+    );
+    FT median_item_area;
+
     std::deque<std::pair<std::pair<FT,FT>,ordered_set_rev<std::pair<FT,int>>>> buckets;
     FT total_area_packed;
+    FT smallest_item_area;
+    FT largest_item_area;
     int get_bucket_for_area_container(FT area);
     std::vector<int> get_buckets_for_area_item(FT item_area);
     std::pair<ItemsContainer,std::vector<int>> extract_items_bucket_sampling(
