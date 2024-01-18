@@ -3,12 +3,11 @@
 #include <bits/stdc++.h>
 
 #include "lib/util/cgal.h"
-#include "lib/util/common.h"
 
 struct Item {
 
     FT value;
-    ll quantity;
+    long long quantity;
     Polygon pol;
     int idx;
     Vector ref_scaling_translation; // TODO: move this somewhere else
@@ -26,7 +25,7 @@ public:
     ItemsContainer();
     ItemsContainer(std::vector<std::tuple<int,int,Polygon>> _items);
     void add_item(Item item); 
-    void add_item(FT v, ll q, Polygon p, int idx, Vector ref_scaling_translation); 
+    void add_item(FT v, long long q, Polygon p, int idx, Vector ref_scaling_translation); 
     ItemsContainer expand(); 
     int size(); 
     Item& operator[](std::size_t i); 
@@ -58,6 +57,7 @@ public:
     PackingInput input;
     ItemsContainer items;
     std::map<int,int> item_count;
+    FT score;
 
     void validate_item(Item item); 
 

@@ -1,8 +1,12 @@
+import fnmatch
+import json
 import sys
 import time
-from py.algorithm import run_algorithm
-from py.io import read_instances, write_output, generate_run_id, get_output_directory_for_instance, StreamTee
-from py.outputgrabber import OutputGrabber 
+from py.algorithm import run_algorithm, run_repacking_algorithm
+from py.configuration import OutputConfiguration
+from py.io import read_instance, read_instances, read_output_metadata, write_output, generate_run_id, get_output_directory_for_instance, StreamTee
+from py.outputgrabber import OutputGrabber
+from py.polygon import Polygon 
 from py.visualize import visualize
 import os
 import subprocess
@@ -10,6 +14,57 @@ import concurrent.futures
 from multiprocessing import Pool
 
 # time.sleep(20)
+
+
+def get_best_output_conf(name):
+
+    def translate(items, translations):
+        res = []
+        for j in range(len(items)):
+            new_item = []
+            a = items[j].get_approx_representation()
+            for i in range(len(a)):
+                new_item.append([a[i][0] + translations[j][0], a[i][1] + translations[j][1]])
+            res.append(Polygon(new_item))
+        return res
+
+    def find_solution_json_files(directories):
+        matches = []
+        for directory in directories:
+            for root, _dirnames, filenames in os.walk(directory):
+                for filename in fnmatch.filter(filenames, 'solution.json'):
+                    matches.append(os.path.join(root, filename))
+        return matches
+
+    solution_files = find_solution_json_files(["output/runs", "/tmp/runs"])
+
+    best_score = -1
+    best_file = None
+    for file in solution_files:
+        metadata = read_output_metadata(file)
+        assert metadata["output_filename"] == file
+        tname = metadata["name"]
+        score = metadata["score"]
+        if tname == name and score > best_score:
+            best_score = score
+            best_file = file
+            best_infile = metadata["input_filename"]
+            print("[py] Found solution with score", score, "in", file)
+
+    assert best_file is not None
+
+    input_conf = read_instance(best_infile)[2]
+    with open(file, "r") as f:
+        data = json.load(f)
+    translations = list(zip(data["x_translations"], data["y_translations"]))
+    indices = list(map(int, data["item_indices"]))
+    included_items = [input_conf.items[i] for i in indices]
+    return OutputConfiguration(
+        indices,
+        translations,
+        translate(included_items, translations),
+        input_conf
+    )
 
 
 def get_base_output_dir(run_id, use_tmp=True):
@@ -25,20 +80,21 @@ def get_environment_variables(env):
     should_write = "SHOULD_WRITE" in env and env["SHOULD_WRITE"] == "1"
     in_production = "PRODUCTION" in env and env["PRODUCTION"] == "1"
     should_visualize = "VISUALIZE" in env and env["VISUALIZE"] == "1"
+    should_repack = "REPACK" in env and env["REPACK"] == "1"
     description = ""
     if "DESC" in env: description = env["DESC"]
     if in_production and should_write: assert len(description) > 3
     only_stats = "ONLY_STATS" in env and env["ONLY_STATS"] == "1"
     if only_stats: should_write = False
     run_id = env["RUN_ID"] if "RUN_ID" in env else generate_run_id()
-    return should_write, description, only_stats, run_id, should_visualize, in_production
+    return should_write, description, only_stats, run_id, should_visualize, in_production, should_repack
 
 
 def run_sequentially(p):
     instances = p[0]
     env = p[1]
 
-    should_write, description, only_stats, run_id, should_visualize, in_production = get_environment_variables(env)
+    should_write, description, only_stats, run_id, should_visualize, in_production, should_repack = get_environment_variables(env)
 
     for name, filename, input_conf in instances:
 
@@ -59,7 +115,8 @@ def run_sequentially(p):
             s += f"[py] Max x/y coord: {input_conf.get_max_xy()}\n"
             s += f"[py] Weak upper bound: {input_conf.get_weak_upper_bound()}\n"
             s += f"[py] Strong upper bound: {input_conf.get_strong_upper_bound()}\n"
-            s += f"[py] Max number of placed items (upper bound): {input_conf.get_max_number_of_placed_items()}"
+            s += f"[py] Max number of placed items (upper bound): {input_conf.get_max_number_of_placed_items()}\n"
+            s += f"[py] Is repacking: {should_repack}"
             return s
 
         print(get_information())
@@ -67,9 +124,16 @@ def run_sequentially(p):
         if only_stats:
             print()
             continue
-
+    
+        best_output_conf = None
+        if should_repack:
+            best_output_conf = get_best_output_conf(name)
         start_time = time.time()
-        output_conf = run_algorithm(input_conf)
+        output_conf = None
+        if best_output_conf is None:
+            output_conf = run_algorithm(input_conf)
+        else:
+            output_conf = run_repacking_algorithm(input_conf, best_output_conf)
         end_time = time.time()
         time_taken = end_time - start_time
 
@@ -123,7 +187,7 @@ if in_parallel:
 
     print(f"[py-manager] RUNNING IN PARALLEL WITH MAX_THREADS={max_threads}")
 
-    should_write, description, only_stats, run_id, should_visualize, in_production = get_environment_variables(os.environ)
+    should_write, description, only_stats, run_id, should_visualize, in_production, should_repack = get_environment_variables(os.environ)
 
     # inputs = []
     # for name, filename, input_conf in instances:

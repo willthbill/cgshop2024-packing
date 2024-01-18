@@ -88,6 +88,7 @@ void PackingOutput::validate_item(Item item) {
 }
 
 PackingOutput::PackingOutput(PackingInput _input) {
+    score = 0;
     input = _input;
 }
 
@@ -95,6 +96,7 @@ void PackingOutput::add_item(Item item) {
     validate_item(item);
     item_count[item.idx]++;
     items.add_item(item);
+    score += item.value;
 }
 
 // also validates item.pol
@@ -158,11 +160,12 @@ void PackingOutput::validate_result() {
 }
 
 FT PackingOutput::get_score() {
-    FT sum = 0;
+    return score;
+    /*FT sum = 0;
     foe(item, items) {
         sum += item.value;
     }
-    return sum;
+    return sum;*/
 }
 
 int PackingOutput::size() {

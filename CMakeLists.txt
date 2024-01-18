@@ -129,6 +129,10 @@ add_library(heuristic_packing SHARED src/cpp/lib2/heuristic_packing.cpp)
 target_precompile_headers(heuristic_packing PUBLIC ${PRECOMPILE_HEADERS})
 target_link_libraries(heuristic_packing ${CGALLIB} optimal_packing partition_constructor gurobi_mip configuration_space geometry_utils io snap convex_cover simplification util)
 
+add_library(repacking SHARED src/cpp/lib2/repacking.cpp)
+target_precompile_headers(repacking PUBLIC ${PRECOMPILE_HEADERS})
+target_link_libraries(repacking ${CGALLIB} heuristic_packing optimal_packing partition_constructor gurobi_mip configuration_space geometry_utils io snap convex_cover simplification util tree)
+
 ### algorithms ###
 #add_library(dummy_algorithm SHARED src/cpp/algorithms/dummy.cpp)
 #target_link_libraries(dummy_algorithm CGAL::CGAL util)
@@ -147,10 +151,10 @@ target_link_libraries(heuristic_packing ${CGALLIB} optimal_packing partition_con
 add_library(main${pybind11_suffix} SHARED src/cpp/main.cpp)
 target_link_libraries(
     main${pybind11_suffix}
+    repacking
     optimal_packing
     heuristic_packing
     com CGAL::CGAL
     util
     io
 )
-

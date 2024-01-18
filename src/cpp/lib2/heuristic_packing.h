@@ -52,6 +52,12 @@ using ordered_map_rev = tree<T1, T2, std::greater<T1>, rb_tree_tag, tree_order_s
     oset.order_of_key(1); // 0
 */
 
+class HeuristicPackingHelpers {
+public:
+
+    std::vector<Polygon_set> overlay_grid(Polygon_set& container, FT square_size, bool random_offset=true, bool overlap=false);
+};
+
 class AdvancedItemsContainer {
 public:
     FT avg_area;

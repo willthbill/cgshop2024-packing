@@ -130,3 +130,9 @@ class OutputConfiguration(Configuration):
         score = sum(self.values)
         assert self.input_conf.get_weak_upper_bound() >= self.input_conf.get_strong_upper_bound() >= score
         return score
+
+    def get_cpp_translations(self):
+        return [
+            (self.indices[i], self.translations[i])
+            for i in range(len(self.indices))
+        ]

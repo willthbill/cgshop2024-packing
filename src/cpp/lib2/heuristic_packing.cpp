@@ -35,6 +35,9 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int so
         sorted_idxs = input.items.sort_by_area(); // TODO: does this even sort non-increasingly?
     }
     input.items = permute(input.items, sorted_idxs);
+    foe(item, input.items) {
+        debug(item.pol.area().to_double());
+    }
 
     PackingOutput output (_input);
     auto add_item = [&](Item& item, Point p) {
@@ -246,53 +249,51 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     return output;
 }
 
-class HeuristicPackingHelpers {
-public:
 
-    vector<Polygon_set> overlay_grid(Polygon_set& container, FT square_size, bool random_offset=true, bool overlap=false) {
-        FT overlap_factor = FT(0.2);
-        if(overlap) square_size *= FT(1) - overlap_factor;
-        Point start;
-        {
-            auto bbox = get_int_bounding_box(container);
-            start = Point(bbox[0].x() - FT(2), bbox[0].y() - FT(2)); // -2 should not be necessary
-            if(random_offset) {
-                int md = ((int)(square_size * 0.8).to_double());
-                start = Point(
-                    start.x() - rand() % md,
-                    start.y() - rand() % md
-                );
-            }
+///////////// Heuristic Packing helpers ///////////////////
+vector<Polygon_set> HeuristicPackingHelpers::overlay_grid(Polygon_set& container, FT square_size, bool random_offset, bool overlap) {
+    FT overlap_factor = FT(0.2);
+    if(overlap) square_size *= FT(1) - overlap_factor;
+    Point start;
+    {
+        auto bbox = get_int_bounding_box(container);
+        start = Point(bbox[0].x() - FT(2), bbox[0].y() - FT(2)); // -2 should not be necessary
+        if(random_offset) {
+            int md = ((int)(square_size * 0.8).to_double());
+            start = Point(
+                start.x() - rand() % md,
+                start.y() - rand() % md
+            );
         }
-        FT width = get_width(container) + FT(4);
-        FT height = get_height(container) + FT(4);
-        FT number_of_steps_x = ceil_exact(width / square_size) + 2;
-        FT number_of_steps_y = ceil_exact(height / square_size) + 2;
-        vector<Polygon_set> containers;
-        fon(_i, number_of_steps_x) {
-            fon(_j, number_of_steps_y) {
-                FT i = _i;
-                FT j = _j;
-                FT sub = overlap ? overlap_factor * square_size : 0;
-                Polygon square;
-                {
-                    square.push_back(Point(start.x() + i * square_size - sub, start.y() + j * square_size - sub));
-                    square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + j * square_size - sub));
-                    square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + (j + FT(1)) * square_size));
-                    square.push_back(Point(start.x() + i * square_size - sub, start.y() + (j + FT(1)) * square_size));
-                }
-                Polygon_set allowed_space (container);
-                allowed_space.intersection(square);
-                if(allowed_space.is_empty()) continue;
-                //assert(to_polygon_vector(allowed_space).size() == 1);
-                //assert(to_polygon_vector(allowed_space)[0].number_of_holes() == 0);
-                //containers.push_back(to_polygon_vector(allowed_space)[0].outer_boundary());
-                containers.push_back(allowed_space);
-            }
-        }
-        return containers;
     }
-};
+    FT width = get_width(container) + FT(4);
+    FT height = get_height(container) + FT(4);
+    FT number_of_steps_x = ceil_exact(width / square_size) + 2;
+    FT number_of_steps_y = ceil_exact(height / square_size) + 2;
+    vector<Polygon_set> containers;
+    fon(_i, number_of_steps_x) {
+        fon(_j, number_of_steps_y) {
+            FT i = _i;
+            FT j = _j;
+            FT sub = overlap ? overlap_factor * square_size : 0;
+            Polygon square;
+            {
+                square.push_back(Point(start.x() + i * square_size - sub, start.y() + j * square_size - sub));
+                square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + j * square_size - sub));
+                square.push_back(Point(start.x() + (i + FT(1)) * square_size, start.y() + (j + FT(1)) * square_size));
+                square.push_back(Point(start.x() + i * square_size - sub, start.y() + (j + FT(1)) * square_size));
+            }
+            Polygon_set allowed_space (container);
+            allowed_space.intersection(square);
+            if(allowed_space.is_empty()) continue;
+            //assert(to_polygon_vector(allowed_space).size() == 1);
+            //assert(to_polygon_vector(allowed_space)[0].number_of_holes() == 0);
+            //containers.push_back(to_polygon_vector(allowed_space)[0].outer_boundary());
+            containers.push_back(allowed_space);
+        }
+    }
+    return containers;
+}
 
 ////// ADVANCED ITEMS CONTAINER ///////
 FT AdvancedItemsContainer::sorting_metric(int idx) {
@@ -357,7 +358,7 @@ int AdvancedItemsContainer::size() {
     return sz(buckets[get_bucket_for_area_container(area)].se);
 }*/
 int AdvancedItemsContainer::get_bucket_for_area_container(FT area) {
-    int bidx = -1;
+    int bidx = 0;
     fon(i, sz(buckets)) {
         auto& a = buckets[i].fi.fi;
         auto& b = buckets[i].fi.se;
