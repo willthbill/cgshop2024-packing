@@ -121,7 +121,6 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
         }
     }
 
-    debug("yolo1");
 
     // Snapping
     Polygon_set pset;
@@ -181,22 +180,17 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
             }*/
         }
     };
-    debug("yolo2");
     add_integer_points(pol.outer_boundary());
-    debug("yolo3");
     foe(hole, pol.holes()) {
         add_integer_points(hole);
     }
-    debug("yolo4");
     assert(pset.number_of_polygons_with_holes() == 1);
 
     Polygon_with_holes ep;
     foe(pwh, to_polygon_vector(pset)) ep = pwh;
-    debug("yolo5");
 
     auto get_integer_polygon = [](Polygon pol, bool safe_option) {
         assert(pol.orientation() == CGAL::COUNTERCLOCKWISE);
-        debug("hello4");
         Polygon res;
         foe(p, pol) {
             bool is_int = is_integer(p.x()) && is_integer(p.y());
@@ -204,37 +198,27 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
                 res.push_back(p);
             }
         }
-        debug("hello1");
         if(!res.is_simple() || res.orientation() != CGAL::COUNTERCLOCKWISE) {
             cout << "WARNING: integer-only polygon is not simple" << endl;
             if(safe_option) res = Polygon();
             else res = get_convex_hull_of_polygons({res}); // this is bad!
         }
-        debug("hello2");
         if(sz(res) < 3 || res.area() == FT(0)) {
             cout << "WARNING: integer-only polygon has less than 3 points" << endl;
             return Polygon();
         }
-        debug("hello3");
         assert(res.is_simple());
-        debug("hello4");
         assert(res.orientation() == CGAL::COUNTERCLOCKWISE);
         return res;
     };
-    debug("yolo6");
     Polygon_with_holes res (get_integer_polygon(ep.outer_boundary(), false));
-    debug("heyothere");
     foe(hole, ep.holes()) {
         auto t = hole; t.reverse_orientation();
         auto int_hole = get_integer_polygon(t, true);
-        debug("hello5");
         int_hole.reverse_orientation();
-        debug("hello6");
-        debug(sz(int_hole));
         // Catch that hole touches the outer boundary
         try {
             if(sz(int_hole) && is_completely_inside(Polygon_set(res), Polygon_set(int_hole))) {
-                debug("hello7");
                 res.add_hole(int_hole);
             }
         } catch(const std::exception& e) {
@@ -242,7 +226,6 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
         }
         
     }
-    debug("letsgooo");
 
     assert(is_completely_inside(res,pol));
 

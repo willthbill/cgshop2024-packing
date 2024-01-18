@@ -242,8 +242,8 @@ void Gurobi_MIP::set_warm_start(std::map<std::string,FT>& sol) {
     solver.update();
 }
 
-void Gurobi_MIP::fix_variable(std::string var, FT value) {
-    vars[var].set(GRB_DoubleAttr_LB, value.to_double());
-    vars[var].set(GRB_DoubleAttr_UB, value.to_double());
+void Gurobi_MIP::fix_variable(std::string var, FT value, FT slack) {
+    vars[var].set(GRB_DoubleAttr_LB, (value * (FT(1) - slack)).to_double());// * 0.01);
+    vars[var].set(GRB_DoubleAttr_UB, (value * (FT(1) + slack)).to_double());// * 10);
     solver.update();
 }

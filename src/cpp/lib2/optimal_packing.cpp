@@ -15,6 +15,7 @@
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
 #include "lib/util/debug.h"
+#include "lib2/heuristic_packing.h"
 
 using namespace std;
 
@@ -331,7 +332,7 @@ public:
         }
         PackingInput modified_input {
             Polygon_set(scaled_container),
-            scale_items(input.items, FT(scale))
+            scale_items(input.items)
         };
         foe(item, modified_input.items) {
             auto old = item.pol;
@@ -354,6 +355,13 @@ public:
             }
         }
         return modified_input;
+    }
+
+    ItemsContainer scale_items(ItemsContainer items) {
+        foe(item, items) {
+            item.pol = scale_polygon(item.pol, scale);
+        }
+        return items;
     }
 
     vector<MIPConstraint> get_constraints_point_inside_convex_polygon(
@@ -390,7 +398,7 @@ public:
     ) {
         assert(false); // TODO: the problem is that this says that the entire polygon should be inside one of the convex regions. but it should just say that the reference point is inside one region.
         auto cover = ConvexCover::get_convex_cover(pset);
-        {
+        /*{
             FT area_pset = 0;
             FT area_cover = 0;
             foe(p, to_polygon_vector(pset)) {
@@ -412,21 +420,19 @@ public:
                 area_cover += pol.area();
                 assert(pol.is_simple());
                 assert(pol.orientation() == CGAL::COUNTERCLOCKWISE);
-                debug(pol.area());
             }
-            debug(area_pset, area_cover);
             Polygon_set un;
             foe(pol, cover) un.join(pol);
             assert(is_completely_inside(un, pset));
             assert(is_completely_inside(pset, un));
             assert(area_pset <= area_cover);
 
-            /*foe(pwh, to_polygon_vector(existing)) {
+            foe(pwh, to_polygon_vector(existing)) {
                 foe(pol, fix_repeated_points(pwh.outer_boundary())) {
                     items.add_item(0, 1, pol, 0, Vector(0,0));
                 }
-            }*/
-        }
+            }
+        }*/
         vector<vector<MIPVariable>> all_tmp_binaries (sz(items));
         fon(idx, sz(cover)) {
             assert_is_integer_polygon(cover[idx]);
@@ -799,6 +805,102 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
     cout << "[c++] Moving items to found reference point solution coordinates" << endl;
     MIPPackingHelpers helper (NULL, NULL);
     PackingOutput output = helper.produce_output(_input, input.items, solution, in_use_binaries, xys);
+
+    return output;
+}
+
+
+PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initial) {
+
+    cout << "[c++] Optimal rearrangement algorithm" << endl;
+    Gurobi_MIP problem;
+    MIPPackingHelpers helper (&problem, NULL);
+    helper.set_global_packing_parameter(_input);
+
+    cout << "[c++] Scaling input" << endl;
+    auto input = helper.scalesnap_input(_input); // TODO: the container is a polygon set now!!!!!
+    initial.items = helper.scale_items(initial.items);
+
+    initial = HeuristicPackingNOMIP().run(input, false, 1);
+    debug(initial.get_score());
+
+    auto in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
+    auto xys = helper.get_and_add_xy_ref_variables(sz(input.items));
+
+    cout << "[c++] Adding items inside container constraints" << endl;
+    Polygon_set allowed_space;
+    foe(pwh, to_polygon_vector(input.container)) {
+        foe(pol, fix_repeated_points(pwh.outer_boundary())) {
+            allowed_space.join(pol);
+        }
+    }
+    helper.add_constraints_inside_polygon_set(
+        allowed_space,
+        input.items,
+        in_use_binaries,
+        xys
+    );
+
+    cout << "[c++] Adding items no overlap variables and constraints" << endl;
+    fon(i, sz(input.items)) fon(j, i) {
+        helper.add_exact_constraints(
+            xys[i], xys[j], input.items[i], input.items[j],
+            to_string(i) + "_" + to_string(j),
+            in_use_binaries[i], in_use_binaries[j]
+        );
+    }
+
+    cout << "[c++] Fixing binaries" << endl;
+    map<string,FT> solution;
+    fon(i, sz(input.items)) {
+        problem.fix_variable(in_use_binaries[i].se, 1, 0.01);
+        solution[in_use_binaries[i].se] = 1;
+    }
+
+    cout << "[c++] Setting warm start" << endl;
+    foe(item, initial.items) {
+        auto& idx = item.idx;
+        Point ref = item.get_reference_point();
+        solution[xys[idx].fi.se] = ref.x();
+        solution[xys[idx].se.se] = ref.y();
+        problem.fix_variable(xys[idx].fi.se, ref.x(), 0.01);
+        problem.fix_variable(xys[idx].se.se, ref.y(), 0.01);
+    }
+    // problem.set_warm_start(solution);
+
+    cout << "[c++] Settings objective" << endl;
+    MIPVariable topvar = {"int", "topvar"};
+    helper.add_variable(topvar);
+    fon(i, sz(input.items)) {
+        vector<pair<string,FT>> terms;
+        terms.push_back(make_pair(xys[i].second.second, 1));
+        terms.push_back(make_pair(topvar.second, -1));
+        helper.add_constraint({
+            terms,
+            "leq",
+            0
+        });
+    }
+    problem.set_min_objective({{topvar.second, 1}});
+
+    cout << "[c++] Computing solution using MIP" << endl;
+    auto tmp = problem.solve_with_params({.time_limit = 180, .mipgap = 0.5});
+    fon(i, sz(input.items)) {
+        solution[xys[i].fi.se] = tmp[xys[i].fi.se];
+        solution[xys[i].se.se] = tmp[xys[i].se.se];
+    }
+
+    cout << "[c++] Unscaling solution coords" << endl;
+    solution = helper.unscale_xy_coords(solution, xys, input.items);
+
+    cout << "[c++] Moving items to found reference point solution coordinates" << endl;
+    PackingOutput output = helper.produce_output(
+        _input,
+        _input.items,
+        solution,
+        in_use_binaries,
+        xys
+    );
 
     return output;
 }

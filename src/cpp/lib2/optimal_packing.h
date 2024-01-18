@@ -48,3 +48,13 @@ public:
     PackingOutput run(PackingInput); 
 
 };
+
+class OptimalRearrangement{
+
+private:
+
+public:
+
+    PackingOutput run(PackingInput, PackingOutput); 
+
+};

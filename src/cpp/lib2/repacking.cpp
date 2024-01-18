@@ -18,6 +18,7 @@
 #include "lib/util/common.h"
 #include "lib/util/debug.h"
 
+
 class DynamicQueryUtil {
     const int MAX_DELETED = 10000;
     const int BUFFER_SIZE = 1000;
@@ -47,6 +48,7 @@ class DynamicQueryUtil {
         }
         if(deleted > MAX_DELETED || sz(query_utils) > QUERY_UTILS_SIZE) {
             rebuild_query_utils();
+            deleted = 0;
         }
     }
 public:
@@ -54,6 +56,7 @@ public:
         foe(p, points) {
             all_points[p]++;
         }
+        rebuild_query_utils();
     }
     vector<Point> query(Point bottom_left, Point top_right) {
         vector<Point> res;
@@ -97,7 +100,7 @@ public:
     }
 };
 
-const int MAX_ITEMS_IN_PACKING = 50;
+const int MAX_ITEMS_IN_PACKING = 1500; // TODO: this should be big enough
 
 PackingOutput HeuristicRepacking::run(PackingInput _input, PackingOutput _initial) {
     // Expand input
@@ -114,8 +117,9 @@ PackingOutput HeuristicRepacking::run(PackingInput _input, PackingOutput _initia
     // Expand output
     auto initial = _initial;
     foe(item, initial.items) {
-        item.idx = idxs[item.idx].back();
-        idxs[item.idx].pop_back();
+        auto& a = idxs[item.idx];
+        item.idx = a.back();
+        a.pop_back();
     }
     initial.item_count = {};
     foe(item, initial.items) {
@@ -150,6 +154,7 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
 
     // Setup initial solution
     map<int, Polygon> solution;
+    debug(sz(initial.items));
     foe(item, initial.items) {
         solution[item.idx] = item.pol;
     }
@@ -170,7 +175,7 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
         vector<pair<FT,Polygon_set>>,
         IgnoreSecondComparator<FT,Polygon_set>
     > repacking_spaces;
-    rep(10) {
+    rep(1) {
     // while(true) {
 
         // Generate repacking spaces
@@ -215,15 +220,7 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
             }
             space.intersection(get_complement(packed_space));
         }
-
-        // Remove items to repack from the query util and solution
-        foe(idx, items_to_repack) {
-            foe(p, solution[idx]) {
-                point_to_items[p].erase(idx);
-                query_util.remove_point(p);
-            }
-            solution.erase(idx);
-        }
+        debug(sz(items_to_repack));
 
         // Construct input for packing algorithm
         ItemsContainer items;
@@ -234,10 +231,28 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
             items.add_item(new_item);
         }
         PackingInput tinput {space, items};
+        PackingOutput initial (tinput);
+        fon(i, sz(items_to_repack)) {
+            int idx = items_to_repack[i];
+            auto& item = input.items[idx];
+            Item new_item {item.value, 1, solution[idx], i, Vector(0,0)};
+            initial.add_item(new_item);
+        }
 
         // Pack using NOMIP sorted by area
-        PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false, 1);
+        // PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false, 1);
+        PackingOutput toutput = OptimalRearrangement().run(tinput, initial);
 
+        debug(sz(toutput.items));
+
+        // Remove items to repack from the query util and solution
+        foe(idx, items_to_repack) {
+            foe(p, solution[idx]) {
+                point_to_items[p].erase(idx);
+                query_util.remove_point(p);
+            }
+            solution.erase(idx);
+        }
         // Add items to solution
         foe(item, toutput.items) {
             int idx = items_to_repack[item.idx];
@@ -249,13 +264,21 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
         }
     }
 
+    cout << "[c++] Repacking done" << endl;
+
     // Construct output
     PackingOutput output (input);
+    debug(sz(solution));
     foe(p, solution) {
         auto& idx = p.fi;
         auto& pol = p.se;
         Item new_item {input.items[idx].value, 1, pol, idx, Vector(0,0)};
         output.add_item(new_item);
     }
+
+    debug("returning");
+
+    query_util.delete_datastructures();
+
     return output;
 }

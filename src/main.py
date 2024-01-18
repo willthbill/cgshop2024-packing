@@ -40,12 +40,14 @@ def get_best_output_conf(name):
 
     best_score = -1
     best_file = None
+    best_infile = None
     for file in solution_files:
         metadata = read_output_metadata(file)
         assert metadata["output_filename"] == file
         tname = metadata["name"]
         score = metadata["score"]
         if tname == name and score > best_score:
+            print(metadata)
             best_score = score
             best_file = file
             best_infile = metadata["input_filename"]
@@ -54,7 +56,7 @@ def get_best_output_conf(name):
     assert best_file is not None
 
     input_conf = read_instance(best_infile)[2]
-    with open(file, "r") as f:
+    with open(best_file, "r") as f:
         data = json.load(f)
     translations = list(zip(data["x_translations"], data["y_translations"]))
     indices = list(map(int, data["item_indices"]))

@@ -35,9 +35,9 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int so
         sorted_idxs = input.items.sort_by_area(); // TODO: does this even sort non-increasingly?
     }
     input.items = permute(input.items, sorted_idxs);
-    foe(item, input.items) {
+    /*foe(item, input.items) {
         debug(item.pol.area().to_double());
-    }
+    }*/
 
     PackingOutput output (_input);
     auto add_item = [&](Item& item, Point p) {
@@ -66,7 +66,8 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int so
         if(print) cout << "[c++] Finding lowest integral point" << endl;
         vector<Point> vertices;
         foe(pwh, to_polygon_vector(config_space)) {
-            foe(pol, pwh.outer_boundary()) vertices.push_back(pol);
+            foe(p, pwh.outer_boundary()) vertices.push_back(p);
+            foe(hole, pwh.holes()) foe(p, hole) vertices.push_back(p);
             // TODO: holes needed?
         }
         sort(vertices.begin(), vertices.end(), [](Point& a, Point& b) {

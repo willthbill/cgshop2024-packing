@@ -52,7 +52,11 @@ vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> cgal2output(
 ) {
     vector<tuple<int,pair<string,string>,vector<pair<string,string>>>> res;
     foe(item, output) {
-        res.eb(item.idx, vector2pstr(output.get_translation(item)), polygon2points(item.pol));
+        res.eb(
+            item.idx,
+            vector2pstr(output.get_translation(item)),
+            polygon2points(item.pol)
+        );
     }
     return res;
 }

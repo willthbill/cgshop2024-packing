@@ -83,7 +83,7 @@ public:
 
     void set_warm_start(std::map<std::string,FT>& sol);
 
-    void fix_variable(std::string var, FT value);
+    void fix_variable(std::string var, FT value, FT slack = 0);
 
     ~Gurobi_MIP() override;
 
