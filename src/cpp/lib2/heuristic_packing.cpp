@@ -685,7 +685,7 @@ void HeuristicPackingRecursive::solve(
         );
         auto [sampled_items, indices] = items.extract_items_bucket_sampling(
             to_sample,
-            get_area_of_largest_convex_cover_piece(container), //area(container), // TODO: try with normal area as well
+            area(container), // get_area_of_largest_convex_cover_piece(container),
             original_container_area
         );
         /*auto [sampled_items, indices] = items.extract_items_median_sampling(
