@@ -36,7 +36,7 @@ def get_best_output_conf(name):
                     matches.append(os.path.join(root, filename))
         return matches
 
-    solution_files = find_solution_json_files(["output/runs", "/tmp/runs"])
+    solution_files = find_solution_json_files(["output/runs"])  # , "/tmp/runs"])
 
     best_score = -1
     best_file = None
@@ -47,7 +47,6 @@ def get_best_output_conf(name):
         tname = metadata["name"]
         score = metadata["score"]
         if tname == name and score > best_score:
-            print(metadata)
             best_score = score
             best_file = file
             best_infile = metadata["input_filename"]

@@ -156,14 +156,25 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
     }
 
     // Polygon_set non_repacked = input.container;
-    // AdvancedItemsContainer available_items; // items not yet packed
-    // TODO: initialize items
+
+
+    // Rewrite the below things to use add and remove functions
 
     // Setup initial solution
+    FT score = 0;
     map<int, Polygon> solution;
     debug(sz(initial.items));
     foe(item, initial.items) {
         solution[item.idx] = item.pol;
+        score += item.value;
+    }
+
+    // Setup available items
+    AdvancedItemsContainer available_items (input.items); // items not yet packed
+    foe(item, input.items) {
+        if(solution.count(item.idx)) {
+            available_items.erase_item(item.idx);
+        }
     }
 
     // Create query datastructures
@@ -177,11 +188,42 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
     }
     DynamicQueryUtil query_util (points);
 
+    // Used temporarily and in the end
+    PackingOutput output (input);
+
     priority_queue<
         pair<FT,Polygon_set>,
         vector<pair<FT,Polygon_set>>,
         IgnoreSecondComparator<FT,Polygon_set>
     > repacking_spaces;
+
+
+    auto add_to_solution = [&](int idx, Polygon pol, bool already_erased = false) {
+        if(solution.count(idx)) {
+            cout << "WARNING: adding item to solution that is already in solution" << endl;
+        }
+        solution[idx] = pol;
+        foe(p, pol) {
+            point_to_items[p].insert(idx);
+            query_util.add_point(p);
+        }
+        score += input.items[idx].value;
+        if(!already_erased) available_items.erase_item(idx);
+    };
+
+    auto remove_from_solution = [&](int idx) {
+        if(!solution.count(idx)) {
+            cout << "WARNING: removing item from solution that is not in solution" << endl;
+        }
+        foe(p, solution[idx]) {
+            point_to_items[p].erase(idx);
+            query_util.remove_point(p);
+        }
+        solution.erase(idx);
+        score -= input.items[idx].value;
+        available_items.add_item(idx);
+    };
+
     rep(1) {
     // while(true) {
 
@@ -254,35 +296,80 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
             initial.add_item(new_item);
         }
 
-        // Pack using NOMIP sorted by area
+        // Pack using NOMIP
         // PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false, 1);
         PackingOutput toutput = OptimalRearrangement().run(tinput, initial);
 
         debug(sz(toutput.items));
 
+        // Mark used items
+        set<int> is_used; // could be vector<bool>
+        foe(item, toutput.items) {
+            int idx = items_to_repack[item.idx];
+            is_used.insert(idx);
+        }
+
+        // TODO: make remove and add functions
         // Remove items to repack from the query util and solution
         foe(idx, items_to_repack) {
-            foe(p, solution[idx]) {
+            remove_from_solution(idx);
+            /*foe(p, solution[idx]) {
                 point_to_items[p].erase(idx);
                 query_util.remove_point(p);
             }
             solution.erase(idx);
+            score -= input.items[idx].value;
+            // If not used then add to available items
+            if(!is_used.count(idx)) {
+                available_items.add_item(idx);
+            }*/
         }
         // Add items to solution
         foe(item, toutput.items) {
             int idx = items_to_repack[item.idx];
-            solution[idx] = item.pol;
+            add_to_solution(idx, item.pol);
+            /*solution[idx] = item.pol;
             foe(p, item.pol) {
                 point_to_items[p].insert(idx);
                 query_util.add_point(p);
             }
+            score += input.items[idx].value;*/
+            // Update space
+            space.intersection(get_complement(Polygon_set(item.pol)));
         }
+
+        // Pack items into the remaining space
+        auto tpacked = get_complement(space);
+        HeuristicPackingRecursive().solve(
+            space,
+            available_items,
+            output,
+            tpacked,
+            area(space),
+            0
+        );
+        // Add items to solution
+        foe(item, output) {
+            add_to_solution(item.idx, item.pol, true);
+            /*solution[item.idx] = item.pol;
+            foe(p, item.pol) {
+                point_to_items[p].insert(item.idx);
+                query_util.add_point(p);
+            }
+            score += input.items[item.idx].value;*/
+        }
+        // Reset output
+        output.items = ItemsContainer();
+        output.item_count = {};
+        output.score = 0;
+
+        cout << "[c++] SCORE: " << score << endl;
     }
 
     cout << "[c++] Repacking done" << endl;
 
     // Construct output
-    PackingOutput output (input);
+    output = PackingOutput (input);
     debug(sz(solution));
     foe(p, solution) {
         auto& idx = p.fi;

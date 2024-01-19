@@ -189,6 +189,7 @@ map<string,FT> Gurobi_MIP::solve_with_params(
     // solver.set(GRB_DoubleParam_Cutoff, 100);
     solver.set(GRB_DoubleParam_MIPGap, config.mipgap);
     solver.set(GRB_DoubleParam_TimeLimit, config.time_limit);
+    solver.set(GRB_IntParam_Threads, 25);
 
     // HEURISTICS
     //solver.set(GRB_IntParam_Presolve, 2);

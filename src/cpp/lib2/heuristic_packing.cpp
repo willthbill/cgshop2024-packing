@@ -696,11 +696,11 @@ void HeuristicPackingRecursive::solve(
             original_container_area,
             area(container)
         );*/
-        /*if(sz(sampled_items)) {
+        if(sz(sampled_items)) {
             debug(sz(sampled_items), sampled_items.get_average_area().to_double(), depth);
         } else {
             debug("no items", depth);
-        }*/
+        }
         /*foe(item, sampled_items) {
             ASSERT(item.pol.area() <= area(container),"");
         }*/
@@ -832,6 +832,8 @@ void HeuristicPackingRecursive::solve(
         - gurobi heuristics (see chatgpt)
             - try disable NoRed
         - gurobi parameters
+        - dynamisk sætte tidsgrænser for gurobi og andet
+        - try just minimizing sum of y or x (with fixed x/y) for faster
 */
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container

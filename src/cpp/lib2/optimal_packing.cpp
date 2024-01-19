@@ -69,7 +69,7 @@ public:
         max_partition_size = 100'000'000;
         assert(max_partition_size > 0);
 
-        biginf = 10'000'000; // BIG M, must be greater than inf * scale * inf * scale
+        biginf = 100'000'000; // BIG M, must be greater than inf * scale * inf * scale
         assert(biginf > 0);
 
         // mx * mx * 1.1 * 1.1 * 1.3 * 1.3 + 10000 < biginf
@@ -915,7 +915,7 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         }
 
         cout << "[c++] Computing solution using MIP" << endl;
-        auto tmp = problem.solve_with_params({.time_limit = 180, .mipgap = 0});
+        auto tmp = problem.solve_with_params({.time_limit = 300, .mipgap = 0});
         foe(e, tmp) {
             solution[e.fi] = e.se;
         }
@@ -928,6 +928,7 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
     solve(0);
     solve(1);
     solve(2);
+    solve(3);
 
     cout << "[c++] Unscaling solution coords" << endl;
     solution = helper.unscale_xy_coords(solution, xys, input.items);
