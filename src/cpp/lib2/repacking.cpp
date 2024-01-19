@@ -147,6 +147,13 @@ struct IgnoreSecondComparator {
 
 PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial) {
     FT average_item_area = input.items.get_average_area();
+    FT max_item_width = 0;
+    FT max_item_height = 0;
+    foe(item, input.items) {
+        auto t = Polygon_set(item.pol);
+        max_item_width = max(max_item_width, get_width(t));
+        max_item_height = max(max_item_height, get_height(t));
+    }
 
     // Polygon_set non_repacked = input.container;
     // AdvancedItemsContainer available_items; // items not yet packed
@@ -181,7 +188,7 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
         // Generate repacking spaces
         if(sz(repacking_spaces) == 0) {
             cout << "[c++] Generating spaces to repack" << endl;
-            FT square_size = sqrt((FT(MAX_ITEMS_IN_PACKING) / FT(2.1) * average_item_area).to_double()) - 2;
+            FT square_size = sqrt((FT(MAX_ITEMS_IN_PACKING) / FT(2) * average_item_area).to_double()) - 2;
             auto squares = HeuristicPackingHelpers().overlay_grid(
                 input.container,
                 square_size,
@@ -189,7 +196,9 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
                 true
             );
             foe(square, squares) {
-                repacking_spaces.push(make_pair((int)1, square)); // TODO: something smarter than 1
+                repacking_spaces.push(make_pair((int)1, square));
+                // TODO: something smarter than 1
+                // TODO: based on density and total area and maybe something with number of items and their areas
             }
         }
 
@@ -200,7 +209,11 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
         vector<int> items_to_repack;
         {
             auto bbox = get_int_bounding_box(space);
-            vector<Point> points = query_util.query(bbox[0], bbox[2]);
+            vector<Point> points = query_util.query(
+                bbox[0] - Vector(max_item_width + 10, max_item_height + 10),
+                bbox[2] + Vector(max_item_width + 10, max_item_height + 10)
+            );
+            // We sub/add this vector to ensure any item overlapping with the space is queried
             auto comp_space = get_complement(space);
             set<int> checked;
             Polygon_set packed_space;
@@ -210,6 +223,7 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
                         continue;
                     }
                     auto& pol = solution[idx];
+                    // TODO: Could maybe also just check that all the vertices are queried, since the space is convex
                     if(comp_space.oriented_side(pol) != CGAL::ON_POSITIVE_SIDE) {
                         items_to_repack.push_back(idx);
                     } else {
@@ -231,6 +245,7 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
             items.add_item(new_item);
         }
         PackingInput tinput {space, items};
+        // TODO: move to (0,0)
         PackingOutput initial (tinput);
         fon(i, sz(items_to_repack)) {
             int idx = items_to_repack[i];

@@ -825,6 +825,13 @@ void HeuristicPackingRecursive::solve(
     - Try this?: https://github.com/tamasmeszaros/libnest2d
     - Use different parameters for different instances
     - Try running with the median method as well
+
+    Repacking
+        - Move to (0,0)
+        - multiple objectives gurobi
+        - gurobi heuristics (see chatgpt)
+            - try disable NoRed
+        - gurobi parameters
 */
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container

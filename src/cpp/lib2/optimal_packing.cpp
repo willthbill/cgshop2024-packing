@@ -306,32 +306,37 @@ public:
     }
 
     PackingInput scalesnap_input(PackingInput& input) {
-        auto container = get_single_polygon(input.container);
-        cout << "Original container area: " << container.area().to_double() << endl;
-        Polygon scaled_container;
-        {
-            auto t = get_complement(Polygon_set(scale_polygon(container, FT(scale))));
-            t.intersection(get_big_square());
-            auto v = to_polygon_vector_ref(SnapToGrid(t).space);
-            assert(sz(v) == 1);
-            assert(v[0].number_of_holes() == 1);
-            scaled_container = *v[0].holes_begin();
-            scaled_container.reverse_orientation();
-        }
-        if(scale < 1) {
-            // assert(is_completely_inside(Polygon_set(container), Polygon_set(scaled_container)));
-        } else {
-            //assert(is_completely_inside(Polygon_set(scaled_container), Polygon_set(container)));
-        }
-        cout << "Snapped container area: " << scaled_container.area().to_double() << endl;
-        foe(p, scaled_container) {
-            assert(is_integer(p.x()));
-            assert(is_integer(p.y()));
-            //assert(p.x() >= 0);
-            //assert(p.y() >= 0);
+        Polygon_set scaled_container_all;
+        foe(pwh, to_polygon_vector(input.container)) {
+            auto t = Polygon_set(pwh);
+            auto container = get_single_polygon(t); // it cannot have holes
+            cout << "Original container area: " << container.area().to_double() << endl;
+            Polygon scaled_container;
+            {
+                auto t = get_complement(Polygon_set(scale_polygon(container, FT(scale))));
+                t.intersection(get_big_square());
+                auto v = to_polygon_vector_ref(SnapToGrid(t).space);
+                assert(sz(v) == 1);
+                assert(v[0].number_of_holes() == 1);
+                scaled_container = *v[0].holes_begin();
+                scaled_container.reverse_orientation();
+            }
+            if(scale < 1) {
+                // assert(is_completely_inside(Polygon_set(container), Polygon_set(scaled_container)));
+            } else {
+                //assert(is_completely_inside(Polygon_set(scaled_container), Polygon_set(container)));
+            }
+            cout << "Snapped container area: " << scaled_container.area().to_double() << endl;
+            foe(p, scaled_container) {
+                assert(is_integer(p.x()));
+                assert(is_integer(p.y()));
+                //assert(p.x() >= 0);
+                //assert(p.y() >= 0);
+            }
+            scaled_container_all.join(scaled_container);
         }
         PackingInput modified_input {
-            Polygon_set(scaled_container),
+            scaled_container_all,
             scale_items(input.items)
         };
         foe(item, modified_input.items) {
@@ -816,10 +821,9 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
     helper.set_global_packing_parameter(_input);
 
     cout << "[c++] Scaling input" << endl;
-    auto input = helper.scalesnap_input(_input); // TODO: the container is a polygon set now!!!!!
-    ASSERT(false,"look above");
+    auto input = helper.scalesnap_input(_input);
     initial.items = helper.scale_items(initial.items);
-    initial = HeuristicPackingNOMIP().run(input, false, 1);
+    initial = HeuristicPackingNOMIP().run(input, false, 1); // TODO: 0 or 1?
     debug(initial.get_score());
 
     auto in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
@@ -847,6 +851,7 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
             xys
         );
 
+        // TODO: don't compute these twice
         cout << "[c++] Adding items no overlap variables and constraints" << endl;
         fon(i, sz(input.items)) fon(j, i) {
             helper.add_exact_constraints(
@@ -857,20 +862,36 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         }
 
         cout << "[c++] Settings objective" << endl;
-        MIPVariable topvar = {"int", "topvar"};
-        helper.add_variable(topvar);
-        fon(i, sz(input.items)) {
-            vector<pair<string,FT>> terms;
-            terms.push_back(make_pair(xys[i].second.second, 1));
-            terms.push_back(make_pair(topvar.second, -1));
-            auto tpol = Polygon_set(input.items[i].pol);
-            helper.add_constraint({
-                terms,
-                "leq",
-                -get_height(tpol)
-            });
+        { // minimizing top y value
+            MIPVariable topvar = {"int", "topvar"};
+            helper.add_variable(topvar);
+            fon(i, sz(input.items)) {
+                vector<pair<string,FT>> terms;
+                terms.push_back(make_pair(xys[i].second.second, 1));
+                terms.push_back(make_pair(topvar.second, -1));
+                auto tpol = Polygon_set(input.items[i].pol);
+                helper.add_constraint({
+                    terms,
+                    "leq",
+                    -get_height(tpol)
+                });
+            }
+            if(stage <= 1) problem.set_min_objective({{topvar.second, 1}});
+            else problem.fix_variable(topvar.second, solution[topvar.second], 0.01);
         }
-        problem.set_min_objective({{topvar.second, 1}});
+        if(stage == 2) { // minimize sum of y values
+            vector<pair<string,FT>> terms;
+            fon(i, sz(input.items)) terms.push_back(make_pair(xys[i].second.second, 1)); // base on area
+            problem.set_min_objective(terms);
+        }
+        if(stage == 3) { // minimize sum of x values
+            fon(i, sz(input.items)) {
+                problem.fix_variable(xys[i].second.second, solution[xys[i].second.second], 0.01);
+            }
+            vector<pair<string,FT>> terms;
+            fon(i, sz(input.items)) terms.push_back(make_pair(xys[i].first.second, 1)); // base on area
+            problem.set_min_objective(terms);
+        }
 
         cout << "[c++] Fixing binaries" << endl;
         fon(i, sz(input.items)) {
@@ -906,6 +927,7 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
 
     solve(0);
     solve(1);
+    solve(2);
 
     cout << "[c++] Unscaling solution coords" << endl;
     solution = helper.unscale_xy_coords(solution, xys, input.items);

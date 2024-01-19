@@ -141,13 +141,18 @@ void Gurobi_MIP::_set_objective(string type, vector<pair<string,FT>> c) {
     // cout << "[c++] Objective: " << expr << endl;
     if(type == "max") {
         cout << "[c++] Setting objective to max" << endl;
-        solver.setObjective(expr, GRB_MAXIMIZE);
+        //solver.setObjective(expr, GRB_MAXIMIZE);
+        solver.setObjectiveN(expr, obj_idx, obj_idx, 1);
+        if(obj_idx == 0) solver.set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
     } else if(type == "min") {
         cout << "[c++] Setting objective to min" << endl;
-        solver.setObjective(expr, GRB_MINIMIZE);
+        //solver.setObjective(expr, GRB_MINIMIZE);
+        solver.setObjectiveN(expr, obj_idx, obj_idx, 1);
+        if(obj_idx == 0) solver.set(GRB_IntAttr_ModelSense, GRB_MINIMIZE);
     } else {
         ASSERT(false, "unknown objective type " << type);
     }
+    obj_idx++;
     // get_status(solver);
 }
 
@@ -186,11 +191,11 @@ map<string,FT> Gurobi_MIP::solve_with_params(
     solver.set(GRB_DoubleParam_TimeLimit, config.time_limit);
 
     // HEURISTICS
-    solver.set(GRB_IntParam_Presolve, 2);
-    solver.set(GRB_DoubleParam_NoRelHeurTime, config.time_limit / 2);
-    solver.set(GRB_IntParam_MIPFocus, 3); // 1
-    solver.set(GRB_IntParam_LPWarmStart, 2);
-    solver.set(GRB_DoubleParam_Heuristics, 0.5);
+    //solver.set(GRB_IntParam_Presolve, 2);
+    // solver.set(GRB_DoubleParam_NoRelHeurTime, config.time_limit / 2);
+    solver.set(GRB_IntParam_MIPFocus, 2); // 1, 3
+    //solver.set(GRB_IntParam_LPWarmStart, 2);
+    solver.set(GRB_DoubleParam_Heuristics, 0.9);
     solver.optimize();
 
     auto expr = solver.getObjective();//.getLinExpr();

@@ -56,6 +56,7 @@ public:
         >
     > constraints;
     GRBCallback* callbackobj;
+    int obj_idx = 0;
 
     Gurobi_MIP();
 
