@@ -174,16 +174,22 @@ map<string,FT> Gurobi_MIP::solve_with_params(
     solver.update();
     status();
 
-    // solver.set(GRB_DoubleParam_Cutoff, 100);
-    solver.set(GRB_DoubleParam_MIPGap, config.mipgap);
-    solver.set(GRB_IntParam_MIPFocus, 1);
+    // IMPORTANT
     solver.set(GRB_IntParam_NumericFocus, 3);
-    solver.set(GRB_IntParam_Presolve, 2);
     solver.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
     solver.set(GRB_DoubleParam_IntFeasTol, 1e-9);
+
+    // TIMING
+    // solver.set(GRB_DoubleParam_Cutoff, 100);
+    solver.set(GRB_DoubleParam_MIPGap, config.mipgap);
+    solver.set(GRB_DoubleParam_TimeLimit, config.time_limit);
+
+    // HEURISTICS
+    solver.set(GRB_IntParam_Presolve, 2);
+    solver.set(GRB_DoubleParam_NoRelHeurWork, 30);
+    solver.set(GRB_IntParam_MIPFocus, 3); // 1
     solver.set(GRB_IntParam_LPWarmStart, 2);
     solver.set(GRB_DoubleParam_Heuristics, 0.5);
-    solver.set(GRB_DoubleParam_TimeLimit, config.time_limit);
     // solver.set(GRB_IntParam_LazyConstraints, 1); // TODO: only set when using lazy constraints
     solver.optimize();
 
@@ -236,6 +242,7 @@ map<string,FT> Gurobi_MIP::solve_with_params(
 void Gurobi_MIP::set_warm_start(std::map<std::string,FT>& sol) {
     cout << "[c++] " << "Using warm start" << endl;
     foe(p, sol) {
+        ASSERT(vars.count(p.fi),"");
         auto& var = vars[p.fi];
         var.set(GRB_DoubleAttr_Start, p.se.to_double());
     }

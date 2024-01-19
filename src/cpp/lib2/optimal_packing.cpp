@@ -811,84 +811,100 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
 
 
 PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initial) {
-
     cout << "[c++] Optimal rearrangement algorithm" << endl;
-    Gurobi_MIP problem;
-    MIPPackingHelpers helper (&problem, NULL);
+    MIPPackingHelpers helper (NULL, NULL);
     helper.set_global_packing_parameter(_input);
 
     cout << "[c++] Scaling input" << endl;
     auto input = helper.scalesnap_input(_input); // TODO: the container is a polygon set now!!!!!
     initial.items = helper.scale_items(initial.items);
-
     initial = HeuristicPackingNOMIP().run(input, false, 1);
     debug(initial.get_score());
 
     auto in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
     auto xys = helper.get_and_add_xy_ref_variables(sz(input.items));
 
-    cout << "[c++] Adding items inside container constraints" << endl;
-    Polygon_set allowed_space;
-    foe(pwh, to_polygon_vector(input.container)) {
-        foe(pol, fix_repeated_points(pwh.outer_boundary())) {
-            allowed_space.join(pol);
-        }
-    }
-    helper.add_constraints_inside_polygon_set(
-        allowed_space,
-        input.items,
-        in_use_binaries,
-        xys
-    );
-
-    cout << "[c++] Adding items no overlap variables and constraints" << endl;
-    fon(i, sz(input.items)) fon(j, i) {
-        helper.add_exact_constraints(
-            xys[i], xys[j], input.items[i], input.items[j],
-            to_string(i) + "_" + to_string(j),
-            in_use_binaries[i], in_use_binaries[j]
-        );
-    }
-
-    cout << "[c++] Fixing binaries" << endl;
     map<string,FT> solution;
-    fon(i, sz(input.items)) {
-        problem.fix_variable(in_use_binaries[i].se, 1, 0.01);
-        solution[in_use_binaries[i].se] = 1;
-    }
 
-    cout << "[c++] Setting warm start" << endl;
-    foe(item, initial.items) {
-        auto& idx = item.idx;
-        Point ref = item.get_reference_point();
-        solution[xys[idx].fi.se] = ref.x();
-        solution[xys[idx].se.se] = ref.y();
-        problem.fix_variable(xys[idx].fi.se, ref.x(), 0.01);
-        problem.fix_variable(xys[idx].se.se, ref.y(), 0.01);
-    }
-    // problem.set_warm_start(solution);
+    auto solve = [&](int stage) {
+        Gurobi_MIP problem;
+        MIPPackingHelpers helper (&problem, NULL);
+        helper.get_and_add_in_use_binaries(sz(input.items));
+        helper.get_and_add_xy_ref_variables(sz(input.items));
 
-    cout << "[c++] Settings objective" << endl;
-    MIPVariable topvar = {"int", "topvar"};
-    helper.add_variable(topvar);
-    fon(i, sz(input.items)) {
-        vector<pair<string,FT>> terms;
-        terms.push_back(make_pair(xys[i].second.second, 1));
-        terms.push_back(make_pair(topvar.second, -1));
-        helper.add_constraint({
-            terms,
-            "leq",
-            0
-        });
-    }
-    problem.set_min_objective({{topvar.second, 1}});
+        cout << "[c++] Adding items inside container constraints" << endl;
+        Polygon_set allowed_space;
+        foe(pwh, to_polygon_vector(input.container)) {
+            foe(pol, fix_repeated_points(pwh.outer_boundary())) {
+                allowed_space.join(pol);
+            }
+        }
+        helper.add_constraints_inside_polygon_set(
+            allowed_space,
+            input.items,
+            in_use_binaries,
+            xys
+        );
 
-    cout << "[c++] Computing solution using MIP" << endl;
-    auto tmp = problem.solve_with_params({.time_limit = 180, .mipgap = 0.5});
-    fon(i, sz(input.items)) {
-        solution[xys[i].fi.se] = tmp[xys[i].fi.se];
-        solution[xys[i].se.se] = tmp[xys[i].se.se];
-    }
+        cout << "[c++] Adding items no overlap variables and constraints" << endl;
+        fon(i, sz(input.items)) fon(j, i) {
+            helper.add_exact_constraints(
+                xys[i], xys[j], input.items[i], input.items[j],
+                to_string(i) + "_" + to_string(j),
+                in_use_binaries[i], in_use_binaries[j]
+            );
+        }
+
+        cout << "[c++] Settings objective" << endl;
+        MIPVariable topvar = {"int", "topvar"};
+        helper.add_variable(topvar);
+        fon(i, sz(input.items)) {
+            vector<pair<string,FT>> terms;
+            terms.push_back(make_pair(xys[i].second.second, 1));
+            terms.push_back(make_pair(topvar.second, -1));
+            helper.add_constraint({
+                terms,
+                "leq",
+                0
+            });
+        }
+        problem.set_min_objective({{topvar.second, 1}});
+
+        cout << "[c++] Fixing binaries" << endl;
+        fon(i, sz(input.items)) {
+            problem.fix_variable(in_use_binaries[i].se, 1, stage == 0 ? 0.01 : 0);
+            solution[in_use_binaries[i].se] = 1;
+        }
+
+        if(stage == 0) {
+            cout << "[c++] Fixed start" << endl;
+            foe(item, initial.items) {
+                auto& idx = item.idx;
+                Point ref = item.get_reference_point();
+                //solution[xys[idx].fi.se] = ref.x();
+                //solution[xys[idx].se.se] = ref.y();
+                problem.fix_variable(xys[idx].fi.se, ref.x(), 0.01);
+                problem.fix_variable(xys[idx].se.se, ref.y(), 0.01);
+            }
+        } else {
+            cout << "[c++] Setting warm start" << endl;
+            debug(solution);
+            problem.set_warm_start(solution);
+        }
+
+        cout << "[c++] Computing solution using MIP" << endl;
+        auto tmp = problem.solve_with_params({.time_limit = 180, .mipgap = 0.5});
+        foe(e, tmp) {
+            solution[e.fi] = e.se;
+        }
+        /*fon(i, sz(input.items)) {
+            solution[xys[i].fi.se] = tmp[xys[i].fi.se];
+            solution[xys[i].se.se] = tmp[xys[i].se.se];
+        }*/
+    };
+
+    solve(0);
+    solve(1);
 
     cout << "[c++] Unscaling solution coords" << endl;
     solution = helper.unscale_xy_coords(solution, xys, input.items);
@@ -901,6 +917,5 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         in_use_binaries,
         xys
     );
-
     return output;
 }
