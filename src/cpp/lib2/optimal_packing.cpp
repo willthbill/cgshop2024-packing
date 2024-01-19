@@ -823,7 +823,7 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
     cout << "[c++] Scaling input" << endl;
     auto input = helper.scalesnap_input(_input);
     initial.items = helper.scale_items(initial.items);
-    initial = HeuristicPackingNOMIP().run(input, false, 1); // TODO: 0 or 1?
+    initial = HeuristicPackingNOMIP().run(input, false, 0); // TODO: 0 or 1?
     debug(initial.get_score());
 
     auto in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
@@ -894,9 +894,16 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         }
 
         cout << "[c++] Fixing binaries" << endl;
+        set<int> in_initial;
+        foe(item, initial.items) in_initial.insert(item.idx);
         fon(i, sz(input.items)) {
-            problem.fix_variable(in_use_binaries[i].se, 1, stage == 0 ? 0.01 : 0);
-            solution[in_use_binaries[i].se] = 1;
+            if(in_initial.count(i)) {
+                problem.fix_variable(in_use_binaries[i].se, 1, stage == 0 ? 0.01 : 0);
+                solution[in_use_binaries[i].se] = 1;
+            } else {
+                problem.fix_variable(in_use_binaries[i].se, 0, 0);
+                solution[in_use_binaries[i].se] = 0;
+            }
         }
 
         if(stage == 0) {

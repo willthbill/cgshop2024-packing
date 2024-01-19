@@ -100,7 +100,7 @@ public:
     }
 };
 
-const int MAX_ITEMS_IN_PACKING = 1500; // TODO: this should be big enough
+const int MAX_ITEMS_IN_PACKING = 30; // TODO: this should be big enough
 
 PackingOutput HeuristicRepacking::run(PackingInput _input, PackingOutput _initial) {
     // Expand input
@@ -224,8 +224,9 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
         available_items.add_item(idx);
     };
 
-    rep(1) {
-    // while(true) {
+    bool first_it = true;
+    while(first_it || sz(available_items) > 0) {
+        first_it = false;
 
         // Generate repacking spaces
         if(sz(repacking_spaces) == 0) {

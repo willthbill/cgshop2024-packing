@@ -834,6 +834,10 @@ void HeuristicPackingRecursive::solve(
         - gurobi parameters
         - dynamisk sætte tidsgrænser for gurobi og andet
         - try just minimizing sum of y or x (with fixed x/y) for faster
+        - kør fase 1 og 2 igen og igen
+        - what if before MIP we are not able to place all items. crash?
+    
+    - improve the small instances a lot more
 */
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
