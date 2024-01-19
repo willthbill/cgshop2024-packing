@@ -178,6 +178,7 @@ map<string,FT> Gurobi_MIP::solve_with_params(
     solver.set(GRB_IntParam_NumericFocus, 3);
     solver.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
     solver.set(GRB_DoubleParam_IntFeasTol, 1e-9);
+    // solver.set(GRB_IntParam_LazyConstraints, 1); // TODO: only set when using lazy constraints
 
     // TIMING
     // solver.set(GRB_DoubleParam_Cutoff, 100);
@@ -186,11 +187,10 @@ map<string,FT> Gurobi_MIP::solve_with_params(
 
     // HEURISTICS
     solver.set(GRB_IntParam_Presolve, 2);
-    solver.set(GRB_DoubleParam_NoRelHeurWork, 30);
+    solver.set(GRB_DoubleParam_NoRelHeurTime, config.time_limit / 2);
     solver.set(GRB_IntParam_MIPFocus, 3); // 1
     solver.set(GRB_IntParam_LPWarmStart, 2);
     solver.set(GRB_DoubleParam_Heuristics, 0.5);
-    // solver.set(GRB_IntParam_LazyConstraints, 1); // TODO: only set when using lazy constraints
     solver.optimize();
 
     auto expr = solver.getObjective();//.getLinExpr();

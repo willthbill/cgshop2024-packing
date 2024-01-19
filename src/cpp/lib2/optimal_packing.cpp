@@ -817,6 +817,7 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
 
     cout << "[c++] Scaling input" << endl;
     auto input = helper.scalesnap_input(_input); // TODO: the container is a polygon set now!!!!!
+    ASSERT(false,"look above");
     initial.items = helper.scale_items(initial.items);
     initial = HeuristicPackingNOMIP().run(input, false, 1);
     debug(initial.get_score());
@@ -862,10 +863,11 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
             vector<pair<string,FT>> terms;
             terms.push_back(make_pair(xys[i].second.second, 1));
             terms.push_back(make_pair(topvar.second, -1));
+            auto tpol = Polygon_set(input.items[i].pol);
             helper.add_constraint({
                 terms,
                 "leq",
-                0
+                -get_height(tpol)
             });
         }
         problem.set_min_objective({{topvar.second, 1}});
@@ -888,12 +890,11 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
             }
         } else {
             cout << "[c++] Setting warm start" << endl;
-            debug(solution);
             problem.set_warm_start(solution);
         }
 
         cout << "[c++] Computing solution using MIP" << endl;
-        auto tmp = problem.solve_with_params({.time_limit = 180, .mipgap = 0.5});
+        auto tmp = problem.solve_with_params({.time_limit = 180, .mipgap = 0});
         foe(e, tmp) {
             solution[e.fi] = e.se;
         }
