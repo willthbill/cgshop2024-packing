@@ -94,7 +94,6 @@ public:
 
         mx = ceil((mx * scale.to_double()).to_double());
         inf = ceil((100 + mx * 2.5).to_double()); // upper bound on coordinates
-        debug(inf);
         assert(inf > 0);
         assert(mx > 0);
         assert(mx * 2.5 < inf);
@@ -216,12 +215,10 @@ public:
                     item2.pol,
                     item2.get_reference_point()
                 ).space;
-                debug(config_space.is_valid());
                 // Snap it to a grid
                 config_space_int = get_complement(
                     SnapToGrid(get_complement(config_space)).space
                 ); // TODO: taking complement twice
-                debug(config_space_int.is_valid());
             }
 
             // Computer intersection of large square and completement of configuration space
@@ -422,36 +419,38 @@ public:
     }
     Polygon_set get_integer_configuration_space(Polygon_set& pset, Item& item) {
         Polygon_set disallowed = clean(get_complement(pset));
-        debug(area(pset));
-        debug(item.pol.area());
         auto config_space = clean(ConfigurationSpace(
             disallowed,
             item.pol,
             item.get_reference_point()
         ).space);
-        debug(area(config_space));
 
-        auto comp_of_config_space = get_complement(config_space);
-        Polygon square = get_big_square();
-        comp_of_config_space.intersection(square);
-        debug(area(comp_of_config_space));
+        Polygon_set res;
+        foe(pwh_outer, to_polygon_vector(config_space)) {
+            PartitionConstructor pc (pwh_outer);
+            foe(tri, pc.get_constrained_delaunay_triangulation()) {
 
-        // Snap it to a grid
-        auto config_space_int = clean(get_complement(
-            SnapToGrid(clean(comp_of_config_space)).space
-        )); // TODO: taking complement twice
-        debug(area(config_space_int));
+                auto comp_of_config_space = get_complement(Polygon_set(tri));
+                Polygon square = get_big_square();
+                comp_of_config_space.intersection(square);
 
-        // Remove unbounded region coming from the square
-        Polygon_set cleaned;
-        foe(pwh, to_polygon_vector(config_space_int)) {
-            if(pwh.is_unbounded()) continue;
-            debug("here is a polygon with holes");
-            cleaned.join(pwh);
+                // Snap it to a grid
+                auto config_space_int = clean(get_complement(
+                    SnapToGrid(clean(comp_of_config_space)).space
+                )); // TODO: taking complement twice
+
+                // Remove unbounded region coming from the square
+                Polygon_set cleaned;
+                foe(pwh, to_polygon_vector(config_space_int)) {
+                    if(pwh.is_unbounded()) continue;
+                    cleaned.join(pwh);
+                }
+                config_space_int = cleaned;
+                res.join(config_space_int);
+            }
         }
-        config_space_int = cleaned;
-        debug(area(config_space_int));
-        return config_space_int;
+        //return config_space_int;
+        return res;
     }
     Polygon_set get_allowed_region(Polygon_set& pset, Item& item) {
         auto config_space_int = get_integer_configuration_space(pset, item);
@@ -473,6 +472,13 @@ public:
         }
         return res;
     }
+    vector<Polygon_set> get_allowed_regions(Polygon_set& pset, ItemsContainer& items) {
+        vector<Polygon_set> res;
+        foe(item, items) {
+            res.push_back(get_allowed_region(pset, item));
+        }
+        return res;
+    }
     void add_constraints_inside_polygon_set(
         Polygon_set& pset,
         ItemsContainer& items,
@@ -483,8 +489,15 @@ public:
             auto& item = items[i];
             vector<Polygon> partition;
             auto config_space_int = get_integer_configuration_space(pset, item);
-            partition = ConvexCover::get_convex_cover(config_space_int);
-            debug(sz(partition));
+            //partition = ConvexCover::get_convex_cover(config_space_int);
+            foe(pwh, to_polygon_vector(config_space_int)) {
+                assert(pwh.number_of_holes() == 0);
+                auto tri = pwh.outer_boundary();
+                assert(sz(tri) == 3); // triangle
+                assert_is_integer_polygon(tri);
+                assert(tri.orientation() == CGAL::COUNTERCLOCKWISE);
+                partition.push_back(tri);
+            }
             vector<MIPVariable> all_tmp_binaries;
             fon(idx, sz(partition)) {
                 assert_is_integer_polygon(partition[idx]);
@@ -950,12 +963,19 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         return PackingInput(_input);
     }
     // initial.items = helper.scale_items(initial.items); // TODO: check if any has area 0
-    PackingInput initial_input {
+    /*PackingInput initial_input {
         helper.get_allowed_region(input.container, input.items), // takes into account integer configuration spaces
         input.items
     };
-    initial = HeuristicPackingNOMIP().run(input, false, 0); // TODO: 0 or 1?
-    debug(initial.get_score());
+    initial = HeuristicPackingNOMIP().run(initial_input, false, 0); // TODO: 0 or 1?*/
+    initial = HeuristicPackingNOMIP_custom().run(
+        input,
+        helper.get_allowed_regions(input.container, input.items),
+        false,
+        0
+    ); // TODO: 0 or 1?*/
+    cout << "Warm start solution score: " << initial.get_score() << endl;
+    cout << "Warm start solution size: " << sz(initial.items) << endl;
 
     foe(item, input.items) {
         if(item.pol.area() < 1) {
@@ -979,23 +999,10 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         foe(pwh, to_polygon_vector(input.container)) {
             assert(pwh.number_of_holes() == 0);
             foe(pol, fix_repeated_points(pwh.outer_boundary())) {
-                // TODO: could have extra binaries here for each polygon
-                debug("POL");
-                foe(p, pol) {
-                    debug(p);
-                }
-                debug("END POL");
                 allowed_space.join(pol); // thats stupid!
             }
         }
-        debug("END BUILDING ALLOWED SPACE");
-        foe(item, input.items) {
-            debug("ITEM");
-            foe(p, item.pol) {
-                debug(p);
-            }
-            debug("END ITEM");
-        }
+        // TODO: dont recompute constraints for every stage
         helper.add_constraints_inside_polygon_set(
             allowed_space,
             input.items,
@@ -1013,7 +1020,7 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
             );
         }
 
-        cout << "[c++] Settings objective" << endl;
+        cout << "[c++] Setting objective" << endl;
         { // minimizing top y value
             MIPVariable topvar = {"int", "topvar"};
             helper.add_variable(topvar);
@@ -1063,8 +1070,6 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
             foe(item, initial.items) {
                 auto& idx = item.idx;
                 Point ref = item.get_reference_point();
-                //solution[xys[idx].fi.se] = ref.x();
-                //solution[xys[idx].se.se] = ref.y();
                 problem.fix_variable(xys[idx].fi.se, ref.x(), 0.01);
                 problem.fix_variable(xys[idx].se.se, ref.y(), 0.01);
             }
@@ -1078,10 +1083,6 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         foe(e, tmp) {
             solution[e.fi] = e.se;
         }
-        /*fon(i, sz(input.items)) {
-            solution[xys[i].fi.se] = tmp[xys[i].fi.se];
-            solution[xys[i].se.se] = tmp[xys[i].se.se];
-        }*/
     };
 
     solve(0);

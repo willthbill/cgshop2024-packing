@@ -27,6 +27,22 @@ public:
 
 };
 
+class HeuristicPackingNOMIP_custom {
+
+private:
+
+public:
+
+    PackingOutput run(
+        PackingInput _input,
+        std::vector<Polygon_set> custom_containers,
+        bool print = true,
+        int sort_type = 0
+    );
+
+};
+
+
 class HeuristicPackingGrid {
 
 private:

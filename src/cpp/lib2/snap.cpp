@@ -16,7 +16,6 @@ using namespace std;
 // TODO: support polygon set
 SnapToGrid::SnapToGrid(Polygon_set pset) {
     foe(pwh, to_polygon_vector(pset)) {
-        debug(pwh.is_unbounded());
         space.join(snap(pwh));
     }
 }
@@ -100,28 +99,26 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
                 flag = true;
                 return res;
             }
-            debug(res.area());
             if(original_orientation == CGAL::CLOCKWISE) {
                 res.reverse_orientation();
             }
             return res;
         };
-        debug("rounding outer");
         auto boundary = fix_polygon(pol.outer_boundary(), CGAL::ON_UNBOUNDED_SIDE);
         Polygon_with_holes res;
         if(!flag) {
             res = Polygon_with_holes(boundary);
             foe(hole, pol.holes()) {
                 if(flag) break;
-                debug("rounding hole");
+                /*debug("rounding hole");
                 foe(p, hole) debug(p);
-                debug("done hole");
+                debug("done hole");*/
                 auto new_hole = fix_polygon(hole, CGAL::ON_BOUNDED_SIDE);
                 res.add_hole(new_hole);
             }
         }
         if(!flag) {
-            cout << "[c++, snapper]: used rounding-based snapping" << endl;
+            // cout << "[c++, snapper]: used rounding-based snapping" << endl;
             assert(is_completely_inside(res,pol));
             return res;
         } else {
@@ -213,16 +210,13 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
                 res.push_back(p);
             }
         }
-        /*debug("getting polygon");
-        foe(p, res) debug(p);
-        debug("end of getting");*/
-        if(!res.is_simple() || res.orientation() != CGAL::COUNTERCLOCKWISE) {
-            cout << "WARNING: integer-only polygon is not simple" << endl;
+        if(sz(res) < 3 || !res.is_simple() || res.orientation() != CGAL::COUNTERCLOCKWISE) {
+            //cout << "WARNING: integer-only polygon is not simple" << endl;
             if(safe_option) res = Polygon();
             else res = get_convex_hull_of_polygons({res}); // this is bad!
         }
         if(sz(res) < 3 || res.area() == FT(0)) {
-            cout << "WARNING: integer-only polygon has less than 3 points" << endl;
+            //cout << "WARNING: integer-only polygon has less than 3 points" << endl;
             return Polygon();
         }
         assert(res.is_simple());
@@ -337,6 +331,6 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
         assert_is_integer_polygon(hole);
         assert(hole.is_simple());
     }
-    cout << "[c++, snapper]: used generator-based snapping" << endl;
+    //cout << "[c++, snapper]: used generator-based snapping" << endl;
     return reduced_res;
 }

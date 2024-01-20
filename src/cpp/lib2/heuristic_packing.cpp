@@ -20,6 +20,75 @@
 
 using namespace std;
 
+PackingOutput HeuristicPackingNOMIP_custom::run(
+    PackingInput _input,
+    vector<Polygon_set> custom_containers,
+    bool print,
+    int sort_type
+) {
+    auto input = _input;
+
+    input.items = input.items.expand();
+
+    vector<int> sorted_idxs;
+    if(sort_type == 0) {
+        sorted_idxs = input.items.sort_by_value_over_area();
+    } else if(sort_type == 1) {
+        sorted_idxs = input.items.sort_by_area(); // TODO: does this even sort non-increasingly?
+    }
+    input.items = permute(input.items, sorted_idxs);
+
+    PackingOutput output (_input);
+    auto add_item = [&](Item& item, Point p) {
+        assert(is_integer(p.x()));
+        assert(is_integer(p.y()));
+        Item new_item = item.move_ref_point(p);
+        output.add_item(new_item);
+    };
+    Polygon_set existing;
+    int number_of_included_items = 0;
+    Polygon_set complement_of_container = get_complement(input.container);
+    fon(i, sz(input.items)) {
+        auto& item = input.items[i];
+
+        Polygon_set disallowed_space = get_complement(custom_containers[i]);
+        disallowed_space.join(existing);
+        auto config_space = ConfigurationSpace(
+            disallowed_space,
+            item.pol,
+            item.get_reference_point()
+        ).space;
+
+        vector<Point> vertices;
+        foe(pwh, to_polygon_vector(config_space)) {
+            foe(p, pwh.outer_boundary()) vertices.push_back(p);
+            foe(hole, pwh.holes()) foe(p, hole) vertices.push_back(p);
+        }
+        sort(vertices.begin(), vertices.end(), [](Point& a, Point& b) {
+            if(a.y() == b.y()) return a.x() < b.x();
+            return a.y() < b.y();
+        });
+        if(sz(vertices)) {
+            foe(v, vertices) {
+                foab(dy, -10, 5) foab(dx, -10, 5) { // TODO: probably don't need to check negative
+                    Point p (floor_exact(v.x() + dx), floor_exact(v.y() + dy));
+                    if(config_space.oriented_side(p) != CGAL::ON_NEGATIVE_SIDE) {
+                        add_item(item, p);
+                        existing.join(item.move_ref_point(p).pol); // TODO: just insert instead of join?
+                        number_of_included_items++;
+                        goto next_item;
+                    }
+                }
+            }
+            assert(false);
+        }
+next_item:
+        if(print && i % 15 == 0) cout << "[c++] Number of included items: " << number_of_included_items << " / " << (i + 1) << endl;
+    }
+
+    return output;
+}
+
 PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int sort_type) {
     auto input = _input;
 
