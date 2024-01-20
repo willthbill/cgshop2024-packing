@@ -462,6 +462,15 @@ public:
             auto sum = CGAL::minkowski_sum_2(pwh, pol);
             res.join(sum);
         }
+        /*debug("allowed region");
+        foe(pwh, to_polygon_vector(res)) {
+            debug("tri");
+            foe(p, pwh.outer_boundary()) {
+                debug(p);
+            }
+            debug("end tri");
+        }
+        debug("end allowed region");*/
         return res;
     }
     Polygon_set get_allowed_region(Polygon_set& pset, ItemsContainer& items) {
@@ -974,6 +983,7 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         false,
         0
     ); // TODO: 0 or 1?*/
+    //return initial;
     cout << "Warm start solution score: " << initial.get_score() << endl;
     cout << "Warm start solution size: " << sz(initial.items) << endl;
 
@@ -988,6 +998,9 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
 
     map<string,FT> solution;
 
+    set<int> in_initial;
+    foe(item, initial.items) in_initial.insert(item.idx);
+
     auto solve = [&](int stage) {
         Gurobi_MIP problem;
         MIPPackingHelpers helper (&problem, NULL);
@@ -995,16 +1008,9 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         helper.get_and_add_xy_ref_variables(sz(input.items));
 
         cout << "[c++] Adding items inside container constraints" << endl;
-        Polygon_set allowed_space;
-        foe(pwh, to_polygon_vector(input.container)) {
-            assert(pwh.number_of_holes() == 0);
-            foe(pol, fix_repeated_points(pwh.outer_boundary())) {
-                allowed_space.join(pol); // thats stupid!
-            }
-        }
         // TODO: dont recompute constraints for every stage
         helper.add_constraints_inside_polygon_set(
-            allowed_space,
+            input.container,
             input.items,
             in_use_binaries,
             xys
@@ -1013,6 +1019,8 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         // TODO: don't compute these twice
         cout << "[c++] Adding items no overlap variables and constraints" << endl;
         fon(i, sz(input.items)) fon(j, i) {
+            if(!in_initial.count(i)) continue;
+            if(!in_initial.count(j)) continue;
             helper.add_exact_constraints(
                 xys[i], xys[j], input.items[i], input.items[j],
                 to_string(i) + "_" + to_string(j),
@@ -1025,6 +1033,7 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
             MIPVariable topvar = {"int", "topvar"};
             helper.add_variable(topvar);
             fon(i, sz(input.items)) {
+                if(!in_initial.count(i)) continue;
                 vector<pair<string,FT>> terms;
                 terms.push_back(make_pair(xys[i].second.second, 1));
                 terms.push_back(make_pair(topvar.second, -1));
@@ -1040,21 +1049,29 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         }
         if(stage == 2) { // minimize sum of y values
             vector<pair<string,FT>> terms;
-            fon(i, sz(input.items)) terms.push_back(make_pair(xys[i].second.second, 1)); // base on area
+            fon(i, sz(input.items)) {
+                if(in_initial.count(i)) {
+                    terms.push_back(make_pair(xys[i].second.second, 1)); // base on area
+                }
+            }
             problem.set_min_objective(terms);
         }
         if(stage == 3) { // minimize sum of x values
             fon(i, sz(input.items)) {
-                problem.fix_variable(xys[i].second.second, solution[xys[i].second.second], 0.01);
+                if(in_initial.count(i)) {
+                    problem.fix_variable(xys[i].second.second, solution[xys[i].second.second], 0.01);
+                }
             }
             vector<pair<string,FT>> terms;
-            fon(i, sz(input.items)) terms.push_back(make_pair(xys[i].first.second, 1)); // base on area
+            fon(i, sz(input.items)) {
+                if(in_initial.count(i)) {
+                    terms.push_back(make_pair(xys[i].first.second, 1)); // base on area
+                }
+            }
             problem.set_min_objective(terms);
         }
 
         cout << "[c++] Fixing binaries" << endl;
-        set<int> in_initial;
-        foe(item, initial.items) in_initial.insert(item.idx);
         fon(i, sz(input.items)) {
             if(in_initial.count(i)) {
                 problem.fix_variable(in_use_binaries[i].se, 1, stage == 0 ? 0.01 : 0.01);

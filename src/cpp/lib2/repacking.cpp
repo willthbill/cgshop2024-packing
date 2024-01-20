@@ -101,7 +101,7 @@ public:
     }
 };
 
-const int MAX_ITEMS_IN_PACKING = 30; // TODO: this should be big enough
+const int MAX_ITEMS_IN_PACKING = 1000; // TODO: this should be big enough
 
 PackingOutput HeuristicRepacking::run(PackingInput _input, PackingOutput _initial) {
     // Expand input
@@ -346,7 +346,7 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
             output,
             tpacked,
             area(space),
-            1
+            1 // TODO: 0?
         );
         // Add items to solution
         foe(item, output) {
