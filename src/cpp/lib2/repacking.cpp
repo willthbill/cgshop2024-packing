@@ -285,7 +285,7 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
                     if(comp_space.oriented_side(pol) != CGAL::ON_POSITIVE_SIDE) {
                         items_to_repack.push_back(idx);
                     } else {
-                        packed_space.join(pol); // TODO: maybe use expand?
+                        packed_space.join(expand(pol,10)); // TODO: maybe use expand?
                     }
                     checked.insert(idx);
                 }

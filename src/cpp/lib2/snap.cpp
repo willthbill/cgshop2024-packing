@@ -16,8 +16,7 @@ using namespace std;
 // TODO: support polygon set
 SnapToGrid::SnapToGrid(Polygon_set pset) {
     foe(pwh, to_polygon_vector(pset)) {
-        auto t = Polygon_set(pwh);
-        if(area(t) == FT(0)) continue;
+        debug(pwh.is_unbounded());
         space.join(snap(pwh));
     }
 }

@@ -269,3 +269,19 @@ vector<Polygon> fix_repeated_points(Polygon pol) {
     foe(p, fix_repeated_points(b)) res.push_back(p);
     return res;
 }
+
+Polygon_set clean(Polygon_set pset) {
+    Polygon_set cleaned;
+    foe(pwh, to_polygon_vector(pset)) {
+        if(!pwh.is_unbounded()) {
+            if(sz(pwh.outer_boundary()) < 3 || pwh.outer_boundary().area() == FT(0)) continue;
+        }
+        Polygon_with_holes new_pwh (pwh.outer_boundary());
+        foe(hole, pwh.holes()) {
+            if(sz(hole) < 3 || hole.area() == 0) continue;
+            new_pwh.add_hole(hole);
+        }
+        cleaned.join(new_pwh);
+    }
+    return cleaned;
+}

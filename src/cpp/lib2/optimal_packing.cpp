@@ -310,16 +310,16 @@ public:
     }
 
     PackingInput scalesnap_input(PackingInput& input) {
-        Polygon_set scaled_container_all;
+        /*Polygon_set scaled_container_all;
         foe(pwh, to_polygon_vector(input.container)) {
             auto t = Polygon_set(pwh);
             auto unfixed_container = get_single_polygon(t); // it cannot have holes
             foe(container, fix_repeated_points(unfixed_container)) {
-                /*debug("container");
+                debug("container");
                 foe(p, container) {
                     debug(p);
                 }
-                debug("container end");*/
+                debug("container end");
                 // cout << "Original container area: " << container.area().to_double() << endl;
                 Polygon_set scaled_container;
                 {
@@ -329,6 +329,7 @@ public:
                     assert(sz(v) == 1);
                     // there might be 0 holes
                     foe(hole, v[0].holes()) {
+                        debug(sz(hole));
                         auto t = hole;
                         t.reverse_orientation();
                         scaled_container.join(t);
@@ -346,11 +347,12 @@ public:
                     //assert(p.x() >= 0);
                     //assert(p.y() >= 0);
                 }*/
-                scaled_container_all.join(scaled_container);
-            }
-        }
+                //scaled_container_all.join(scaled_container);
+            //}
+        //}
         PackingInput modified_input {
-            scaled_container_all,
+            //scaled_container_all,
+            input.container,
             scale_items(input.items)
         };
         foe(item, modified_input.items) {
@@ -426,22 +428,35 @@ public:
             vector<Polygon> partition;
             {
                 // Compute configuration space
-                Polygon_set disallowed = get_complement(pset);
+                Polygon_set disallowed = clean(get_complement(pset));
                 debug(area(pset));
-                auto config_space = ConfigurationSpace(
+                debug(area(disallowed));
+                auto config_space = clean(ConfigurationSpace(
                     disallowed,
                     item.pol,
                     item.get_reference_point()
-                ).space;
+                ).space);
                 debug(config_space.is_valid());
                 debug(area(config_space));
 
+                auto comp_of_config_space = get_complement(config_space);
+                Polygon square = get_big_square();
+                comp_of_config_space.intersection(square);
+
                 // Snap it to a grid
-                auto config_space_int = get_complement(
-                    SnapToGrid(get_complement(config_space)).space
-                ); // TODO: taking complement twice
+                auto config_space_int = clean(get_complement(
+                    SnapToGrid(clean(comp_of_config_space)).space
+                )); // TODO: taking complement twice
                 debug(config_space_int.is_valid());
                 debug(area(config_space_int));
+
+                // Remove unbounded region coming from the square
+                Polygon_set cleaned;
+                foe(pwh, to_polygon_vector(config_space_int)) {
+                    if(pwh.is_unbounded()) continue;
+                    cleaned.join(pwh);
+                }
+                config_space_int = cleaned;
 
                 partition = ConvexCover::get_convex_cover(config_space_int);
                 debug(sz(partition));
@@ -910,7 +925,7 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         cout << "[c++] WARNING: Container area is 0" << endl;
         return PackingInput(_input);
     }
-    initial.items = helper.scale_items(initial.items); // TODO: check if any has area 0
+    // initial.items = helper.scale_items(initial.items); // TODO: check if any has area 0
     initial = HeuristicPackingNOMIP().run(input, false, 0); // TODO: 0 or 1?
     debug(initial.get_score());
 

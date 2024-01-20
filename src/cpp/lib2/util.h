@@ -75,3 +75,5 @@ int get_number_of_vertices(Polygon_set pset);
 void assert_is_integer_polygon(Polygon& pol); 
 
 std::vector<Polygon> fix_repeated_points(Polygon pol); 
+
+Polygon_set clean(Polygon_set pset);
