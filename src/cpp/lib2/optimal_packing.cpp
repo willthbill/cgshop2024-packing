@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
 #include <CGAL/Aff_transformation_2.h>
 #include <CGAL/Boolean_set_operations_2.h>
+#include <CGAL/minkowski_sum_2.h>
 
 #include "lib2/simplification.h"
 #include "lib2/convex_cover.cpp"
@@ -310,20 +311,22 @@ public:
     }
 
     PackingInput scalesnap_input(PackingInput& input) {
-        /*Polygon_set scaled_container_all;
+        Polygon_set scaled_container_all;
         foe(pwh, to_polygon_vector(input.container)) {
             auto t = Polygon_set(pwh);
             auto unfixed_container = get_single_polygon(t); // it cannot have holes
             foe(container, fix_repeated_points(unfixed_container)) {
-                debug("container");
+                /*debug("container");
                 foe(p, container) {
                     debug(p);
                 }
-                debug("container end");
+                debug("container end");*/
                 // cout << "Original container area: " << container.area().to_double() << endl;
                 Polygon_set scaled_container;
                 {
-                    auto t = get_complement(Polygon_set(scale_polygon(container, FT(scale))));
+                    auto t = Polygon_set(scale_polygon(container, FT(scale)));
+                    scaled_container.join(t);
+                    /*t = get_complement(t);
                     t.intersection(get_big_square());
                     auto v = to_polygon_vector_ref(SnapToGrid(t).space);
                     assert(sz(v) == 1);
@@ -333,13 +336,13 @@ public:
                         auto t = hole;
                         t.reverse_orientation();
                         scaled_container.join(t);
-                    }
+                    }*/
                 }
-                if(scale < 1) {
+                /*if(scale < 1) {
                     // assert(is_completely_inside(Polygon_set(container), Polygon_set(scaled_container)));
                 } else {
                     //assert(is_completely_inside(Polygon_set(scaled_container), Polygon_set(container)));
-                }
+                }*/
                 //cout << "Snapped container area: " << scaled_container.area().to_double() << endl;
                 /*foe(p, scaled_container) {
                     assert(is_integer(p.x()));
@@ -347,12 +350,12 @@ public:
                     //assert(p.x() >= 0);
                     //assert(p.y() >= 0);
                 }*/
-                //scaled_container_all.join(scaled_container);
-            //}
-        //}
+                scaled_container_all.join(scaled_container);
+            }
+        }
         PackingInput modified_input {
-            //scaled_container_all,
-            input.container,
+            scaled_container_all,
+            // input.container,
             scale_items(input.items)
         };
         foe(item, modified_input.items) {
@@ -417,6 +420,59 @@ public:
         }
         return res;
     }
+    Polygon_set get_integer_configuration_space(Polygon_set& pset, Item& item) {
+        Polygon_set disallowed = clean(get_complement(pset));
+        debug(area(pset));
+        debug(item.pol.area());
+        auto config_space = clean(ConfigurationSpace(
+            disallowed,
+            item.pol,
+            item.get_reference_point()
+        ).space);
+        debug(area(config_space));
+
+        auto comp_of_config_space = get_complement(config_space);
+        Polygon square = get_big_square();
+        comp_of_config_space.intersection(square);
+        debug(area(comp_of_config_space));
+
+        // Snap it to a grid
+        auto config_space_int = clean(get_complement(
+            SnapToGrid(clean(comp_of_config_space)).space
+        )); // TODO: taking complement twice
+        debug(area(config_space_int));
+
+        // Remove unbounded region coming from the square
+        Polygon_set cleaned;
+        foe(pwh, to_polygon_vector(config_space_int)) {
+            if(pwh.is_unbounded()) continue;
+            debug("here is a polygon with holes");
+            cleaned.join(pwh);
+        }
+        config_space_int = cleaned;
+        debug(area(config_space_int));
+        return config_space_int;
+    }
+    Polygon_set get_allowed_region(Polygon_set& pset, Item& item) {
+        auto config_space_int = get_integer_configuration_space(pset, item);
+        Polygon_set res;
+        auto pol = translate_point_to_origin(item.pol, item.get_reference_point());
+        foe(pwh, to_polygon_vector(config_space_int)) {
+            assert(!pwh.is_unbounded());
+            // if(pwh.is_unbounded()) continue;
+            auto sum = CGAL::minkowski_sum_2(pwh, pol);
+            res.join(sum);
+        }
+        return res;
+    }
+    Polygon_set get_allowed_region(Polygon_set& pset, ItemsContainer& items) {
+        Polygon_set res (get_big_square());
+        foe(item, items) {
+            auto t = get_allowed_region(pset, item);
+            res.intersection(t);
+        }
+        return res;
+    }
     void add_constraints_inside_polygon_set(
         Polygon_set& pset,
         ItemsContainer& items,
@@ -426,41 +482,9 @@ public:
         fon(i, sz(items)) {
             auto& item = items[i];
             vector<Polygon> partition;
-            {
-                // Compute configuration space
-                Polygon_set disallowed = clean(get_complement(pset));
-                debug(area(pset));
-                debug(area(disallowed));
-                auto config_space = clean(ConfigurationSpace(
-                    disallowed,
-                    item.pol,
-                    item.get_reference_point()
-                ).space);
-                debug(config_space.is_valid());
-                debug(area(config_space));
-
-                auto comp_of_config_space = get_complement(config_space);
-                Polygon square = get_big_square();
-                comp_of_config_space.intersection(square);
-
-                // Snap it to a grid
-                auto config_space_int = clean(get_complement(
-                    SnapToGrid(clean(comp_of_config_space)).space
-                )); // TODO: taking complement twice
-                debug(config_space_int.is_valid());
-                debug(area(config_space_int));
-
-                // Remove unbounded region coming from the square
-                Polygon_set cleaned;
-                foe(pwh, to_polygon_vector(config_space_int)) {
-                    if(pwh.is_unbounded()) continue;
-                    cleaned.join(pwh);
-                }
-                config_space_int = cleaned;
-
-                partition = ConvexCover::get_convex_cover(config_space_int);
-                debug(sz(partition));
-            }
+            auto config_space_int = get_integer_configuration_space(pset, item);
+            partition = ConvexCover::get_convex_cover(config_space_int);
+            debug(sz(partition));
             vector<MIPVariable> all_tmp_binaries;
             fon(idx, sz(partition)) {
                 assert_is_integer_polygon(partition[idx]);
@@ -926,6 +950,10 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         return PackingInput(_input);
     }
     // initial.items = helper.scale_items(initial.items); // TODO: check if any has area 0
+    PackingInput initial_input {
+        helper.get_allowed_region(input.container, input.items), // takes into account integer configuration spaces
+        input.items
+    };
     initial = HeuristicPackingNOMIP().run(input, false, 0); // TODO: 0 or 1?
     debug(initial.get_score());
 

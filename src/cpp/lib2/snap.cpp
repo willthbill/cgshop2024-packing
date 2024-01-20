@@ -100,17 +100,22 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
                 flag = true;
                 return res;
             }
+            debug(res.area());
             if(original_orientation == CGAL::CLOCKWISE) {
                 res.reverse_orientation();
             }
             return res;
         };
+        debug("rounding outer");
         auto boundary = fix_polygon(pol.outer_boundary(), CGAL::ON_UNBOUNDED_SIDE);
         Polygon_with_holes res;
         if(!flag) {
             res = Polygon_with_holes(boundary);
             foe(hole, pol.holes()) {
                 if(flag) break;
+                debug("rounding hole");
+                foe(p, hole) debug(p);
+                debug("done hole");
                 auto new_hole = fix_polygon(hole, CGAL::ON_BOUNDED_SIDE);
                 res.add_hole(new_hole);
             }

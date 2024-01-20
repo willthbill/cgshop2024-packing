@@ -44,12 +44,9 @@ ConfigurationSpace::ConfigurationSpace(Polygon_set& s, Polygon& _pol, Point ref)
             sum.join(get_complement(Polygon_set(square))); // remove the extra outer part coming from the square
         }*/
 
-        debug(area(sum));
         space.join(sum);
     }
-    debug(area(space));
     space.complement();
-    debug(area(space));
 }
 
 Polygon ConfigurationSpace::get_single_polygon() {
