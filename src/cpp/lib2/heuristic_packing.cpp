@@ -308,7 +308,7 @@ AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
     smallest_item_area = *min_element(item_areas.begin(), item_areas.end());
     largest_item_area = *max_element(item_areas.begin(), item_areas.end());
     avg_area = 0;
-    /*{
+    {
         vector<FT> item_areas_copy = item_areas;
         sort(item_areas_copy.begin(), item_areas_copy.end());
         median_item_area = item_areas_copy[(int)(sz(item_areas_copy) * 0.2)];
@@ -323,9 +323,9 @@ AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
                 buckets[0].se.insert({sorting_metric(i), i});
             }
         }
-    }*/
+    }
 
-    auto tbuckets = buckets;
+    /*auto tbuckets = buckets;
     {
         double f = 1.2; // TODO: test different
         double a = f;
@@ -335,7 +335,7 @@ AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
             pa = a;
             a *= f;
         }
-    }
+    }*/
 
     total_area_packed = accumulate(item_areas.begin(), item_areas.end(), FT(0));
     fon(i, sz(items)) {
@@ -345,12 +345,12 @@ AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
     ASSERT(total_area_packed == FT(0),"");
 
     // Just to remove unused buckets
-    foe(bucket, buckets) {
+    /*foe(bucket, buckets) {
         if(sz(bucket.se)) {
             tbuckets.push_back(bucket);
         }
     }
-    buckets = tbuckets;
+    buckets = tbuckets;*/
 }
 int AdvancedItemsContainer::size() {
     return sz(available_items);
@@ -373,11 +373,11 @@ int AdvancedItemsContainer::get_bucket_for_area_container(FT area) {
     return bidx;
 }
 vector<int> AdvancedItemsContainer::get_buckets_for_area_item(FT item_area) {
-    /*{
+    {
         if(item_area > median_item_area) return {1};
         else return {0};
-    }*/
-    {
+    }
+    /*{
         FT min_area_container = item_area * FT(1);
         FT max_area_container = FT(1e100);
         /*if(item_area / largest_item_area > 0.5) {
@@ -388,14 +388,14 @@ vector<int> AdvancedItemsContainer::get_buckets_for_area_item(FT item_area) {
                 item_area * 20
             );
         }*/
-        int min_bidx = get_bucket_for_area_container(min_area_container);
+    /*^    int min_bidx = get_bucket_for_area_container(min_area_container);
         int max_bidx = get_bucket_for_area_container(max_area_container);
         vector<int> res;
         for(int i = min_bidx; i <= max_bidx; i++) {
             res.push_back(i);
         }
         return res;
-    }
+    }*/
 }
 void AdvancedItemsContainer::add_item(int idx) {
     avg_area = (avg_area * FT(size()) + item_areas[idx]) / FT(size() + 1);
@@ -681,21 +681,21 @@ void HeuristicPackingRecursive::solve(
         int to_sample = max(
             min(
                 min(sz(items), MAX_ITEMS_IN_PACKING),
-                depth == 0 ? ((int)(1e9)) : ((int)((3 * fits).to_double()) + 2) // TODO: big optimization but also a compromise on quality
+                depth == 0 ? ((int)(1e9)) : ((int)((2 * fits).to_double()) + 2) // TODO: big optimization but also a compromise on quality
             ),
-            30
+            20
         );
-        auto [sampled_items, indices] = items.extract_items_bucket_sampling(
+        /*auto [sampled_items, indices] = items.extract_items_bucket_sampling(
             to_sample,
             area(container), // get_area_of_largest_convex_cover_piece(container),
             original_container_area
-        );
-        /*auto [sampled_items, indices] = items.extract_items_median_sampling(
+        );*/
+        auto [sampled_items, indices] = items.extract_items_median_sampling(
             to_sample,
             depth,
             original_container_area,
             area(container)
-        );*/
+        );
         if(sz(sampled_items)) {
             debug(sz(sampled_items), sampled_items.get_average_area().to_double(), depth);
         } else {
