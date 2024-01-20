@@ -69,7 +69,7 @@ public:
         max_partition_size = 100'000'000;
         assert(max_partition_size > 0);
 
-        biginf = 100'000'000; // BIG M, must be greater than inf * scale * inf * scale
+        biginf = 10'000'000; // BIG M, must be greater than inf * scale * inf * scale
         assert(biginf > 0);
 
         // mx * mx * 1.1 * 1.1 * 1.3 * 1.3 + 10000 < biginf
@@ -309,31 +309,41 @@ public:
         Polygon_set scaled_container_all;
         foe(pwh, to_polygon_vector(input.container)) {
             auto t = Polygon_set(pwh);
-            auto container = get_single_polygon(t); // it cannot have holes
-            cout << "Original container area: " << container.area().to_double() << endl;
-            Polygon scaled_container;
-            {
-                auto t = get_complement(Polygon_set(scale_polygon(container, FT(scale))));
-                t.intersection(get_big_square());
-                auto v = to_polygon_vector_ref(SnapToGrid(t).space);
-                assert(sz(v) == 1);
-                assert(v[0].number_of_holes() == 1);
-                scaled_container = *v[0].holes_begin();
-                scaled_container.reverse_orientation();
+            auto unfixed_container = get_single_polygon(t); // it cannot have holes
+            foe(container, fix_repeated_points(unfixed_container)) {
+                debug("container");
+                foe(p, container) {
+                    debug(p);
+                }
+                debug("container end");
+                // cout << "Original container area: " << container.area().to_double() << endl;
+                Polygon_set scaled_container;
+                {
+                    auto t = get_complement(Polygon_set(scale_polygon(container, FT(scale))));
+                    t.intersection(get_big_square());
+                    auto v = to_polygon_vector_ref(SnapToGrid(t).space);
+                    assert(sz(v) == 1);
+                    // there might be 0 holes
+                    foe(hole, v[0].holes()) {
+                        auto t = hole;
+                        t.reverse_orientation();
+                        scaled_container.join(t);
+                    }
+                }
+                if(scale < 1) {
+                    // assert(is_completely_inside(Polygon_set(container), Polygon_set(scaled_container)));
+                } else {
+                    //assert(is_completely_inside(Polygon_set(scaled_container), Polygon_set(container)));
+                }
+                //cout << "Snapped container area: " << scaled_container.area().to_double() << endl;
+                /*foe(p, scaled_container) {
+                    assert(is_integer(p.x()));
+                    assert(is_integer(p.y()));
+                    //assert(p.x() >= 0);
+                    //assert(p.y() >= 0);
+                }*/
+                scaled_container_all.join(scaled_container);
             }
-            if(scale < 1) {
-                // assert(is_completely_inside(Polygon_set(container), Polygon_set(scaled_container)));
-            } else {
-                //assert(is_completely_inside(Polygon_set(scaled_container), Polygon_set(container)));
-            }
-            cout << "Snapped container area: " << scaled_container.area().to_double() << endl;
-            foe(p, scaled_container) {
-                assert(is_integer(p.x()));
-                assert(is_integer(p.y()));
-                //assert(p.x() >= 0);
-                //assert(p.y() >= 0);
-            }
-            scaled_container_all.join(scaled_container);
         }
         PackingInput modified_input {
             scaled_container_all,
@@ -341,6 +351,11 @@ public:
         };
         foe(item, modified_input.items) {
             auto old = item.pol;
+            debug("begin item");
+            foe(p, old) {
+                debug(p);
+            }
+            debug("end item");
             auto old_ref = item.get_reference_point();
             foe(p, old) {
                 assert(p.x() >= 0);
@@ -358,6 +373,7 @@ public:
                 assert(is_integer(p.x()));
                 assert(is_integer(p.y()));
             }
+            // TODO: what happens if sz(item.pol) == 0??
         }
         return modified_input;
     }
@@ -797,7 +813,7 @@ PackingOutput OptimalPackingFast::run(PackingInput _input) {
             if(!solution.count(in_use_binaries[i].se)) continue;
             if(solution[in_use_binaries[i].se] > 0.5) {
                 cout << i << endl;
-                problem.fix_variable(in_use_binaries[i].se, 1);
+                problem.fix_variable(in_use_binaries[i].se, 1, 0.01);
             } else {
                 // problem.fix_variable(in_use_binaries[i].se, 0); // TODO: maybe delete
             }
@@ -822,6 +838,10 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
 
     cout << "[c++] Scaling input" << endl;
     auto input = helper.scalesnap_input(_input);
+    if(area(input.container) < 1) {
+        cout << "[c++] WARNING: Container area is 0" << endl;
+        return PackingInput(_input);
+    }
     initial.items = helper.scale_items(initial.items);
     initial = HeuristicPackingNOMIP().run(input, false, 0); // TODO: 0 or 1?
     debug(initial.get_score());
@@ -898,10 +918,10 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         foe(item, initial.items) in_initial.insert(item.idx);
         fon(i, sz(input.items)) {
             if(in_initial.count(i)) {
-                problem.fix_variable(in_use_binaries[i].se, 1, stage == 0 ? 0.01 : 0);
+                problem.fix_variable(in_use_binaries[i].se, 1, stage == 0 ? 0.01 : 0.01);
                 solution[in_use_binaries[i].se] = 1;
             } else {
-                problem.fix_variable(in_use_binaries[i].se, 0, 0);
+                problem.fix_variable(in_use_binaries[i].se, 0, 0.01);
                 solution[in_use_binaries[i].se] = 0;
             }
         }

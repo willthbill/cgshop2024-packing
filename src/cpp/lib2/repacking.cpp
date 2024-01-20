@@ -225,7 +225,8 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
     };
 
     bool first_it = true;
-    while(first_it || sz(available_items) > 0) {
+    //while(first_it || sz(available_items) > 0) {
+    rep(1) {
         first_it = false;
 
         // Generate repacking spaces
@@ -270,7 +271,7 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
                     if(comp_space.oriented_side(pol) != CGAL::ON_POSITIVE_SIDE) {
                         items_to_repack.push_back(idx);
                     } else {
-                        packed_space.join(pol);
+                        packed_space.join(pol); // TODO: maybe use expand?
                     }
                     checked.insert(idx);
                 }
@@ -347,7 +348,7 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
             output,
             tpacked,
             area(space),
-            0
+            1
         );
         // Add items to solution
         foe(item, output) {

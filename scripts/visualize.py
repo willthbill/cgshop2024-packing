@@ -67,11 +67,15 @@ def plot_polygons2(polygons):
     plt.figure(figsize=(10, 8))
     for polygon in polygons:
         print(len(polygon), end=" ")
+        print(polygon)
     print()
     
+    colors = "rgbybw"
     for i, polygon in enumerate(polygons):
-        x, y = zip(*polygon+ [polygon[0]])  # close the polygon
-        plt.plot(x, y, label="polygon_" + str(i))
+        x, y = zip(*(polygon + [polygon[0]]))  # close the polygon
+        print(x,y)
+        plt.plot(x, y, colors[i] + '-o', label="polygon_" + str(i))
+        plt.axis('equal')
 
     plt.xlabel("X-axis")
     plt.ylabel("Y-axis")

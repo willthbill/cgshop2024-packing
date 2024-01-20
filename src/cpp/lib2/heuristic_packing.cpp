@@ -825,6 +825,7 @@ void HeuristicPackingRecursive::solve(
     - Try this?: https://github.com/tamasmeszaros/libnest2d
     - Use different parameters for different instances
     - Try running with the median method as well
+    - Try median method with other than 0.2
 
     Repacking
         - Move to (0,0)
