@@ -1,5 +1,6 @@
 #include <bits/stdc++.h>
 #include <CGAL/Boolean_set_operations_2.h>
+#include <CGAL/minkowski_sum_2.h>
 
 #include "lib2/repacking.h"
 #include "lib2/simplification.h"
@@ -144,6 +145,19 @@ struct IgnoreSecondComparator {
         return a.first < b.first;
     }
 };
+
+Polygon_with_holes expand(Polygon& pol, FT scale) {
+    Polygon square;
+    FT factor = 0.5;
+    {
+        square.push_back(Point(-factor * scale,-scale * factor));
+        square.push_back(Point(factor * scale,-scale * factor));
+        square.push_back(Point(factor * scale,scale * factor));
+        square.push_back(Point(-factor * scale,scale * factor));
+    }
+    auto sum = CGAL::minkowski_sum_2(pol, square);
+    return sum;
+}
 
 PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial) {
     FT average_item_area = input.items.get_average_area();

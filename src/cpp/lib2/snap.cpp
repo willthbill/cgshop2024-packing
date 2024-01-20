@@ -16,6 +16,8 @@ using namespace std;
 // TODO: support polygon set
 SnapToGrid::SnapToGrid(Polygon_set pset) {
     foe(pwh, to_polygon_vector(pset)) {
+        auto t = Polygon_set(pwh);
+        if(area(t) == FT(0)) continue;
         space.join(snap(pwh));
     }
 }
@@ -73,13 +75,13 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
                 auto& nxt = points[(i + 1) % sz(points)];
                 auto o = CGAL::orientation(pre, cur, nxt);
                 if(o == CGAL::COLLINEAR) {
-                    debug("collinear points");
                     continue;
                 }
                 Vector dir = 
                     (o == CGAL::RIGHT_TURN ? -1 : 1) * (Vector(cur.x(), cur.y()) - Vector(pre.x(), pre.y())) +
                     (o == CGAL::LEFT_TURN ? -1 : 1) * (Vector(nxt.x(), nxt.y()) - Vector(cur.x(), cur.y()));
                 if(condition == CGAL::ON_BOUNDED_SIDE) dir = -dir;
+                if(dir == Vector(0,0)) continue;
                 dir /= sqrt(dir.squared_length().to_double());
                 assert(dir != Vector(0,0));
                 if(dir.x() > 0) cur = Point(ceil_exact(cur.x() + min(10 * dir.x(), 10)), cur.y());
@@ -89,11 +91,6 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
                 res.push_back(cur);
             }
             // TODO: this should come after the checks
-            debug("rounded polygon");
-            foe(p, res) {
-                debug(p);
-            }
-            debug("end of rounded polygon");
             if(
                 !res.is_simple() || res.orientation() == CGAL::CLOCKWISE ||
                 (condition == CGAL::ON_BOUNDED_SIDE ? !is_completely_inside(pol, res) : !is_completely_inside(res, pol))
@@ -101,9 +98,6 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
                 if(original_orientation == CGAL::CLOCKWISE) {
                     res.reverse_orientation();
                 }
-                debug("setting flag");
-                debug(res.is_simple());
-                debug(res.orientation() == CGAL::CLOCKWISE);
                 flag = true;
                 return res;
             }
@@ -116,7 +110,6 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
         Polygon_with_holes res;
         if(!flag) {
             res = Polygon_with_holes(boundary);
-            debug("yoye1");
             foe(hole, pol.holes()) {
                 if(flag) break;
                 auto new_hole = fix_polygon(hole, CGAL::ON_BOUNDED_SIDE);
@@ -245,7 +238,6 @@ Polygon_with_holes SnapToGrid::snap(Polygon_with_holes pol) {
         } catch(const std::exception& e) {
             continue;
         }
-        
     }
 
     assert(is_completely_inside(res,pol));

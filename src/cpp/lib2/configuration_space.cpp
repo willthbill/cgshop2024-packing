@@ -19,23 +19,37 @@ ConfigurationSpace::ConfigurationSpace(Polygon_set& s, Polygon& _pol, Point ref)
         debug(p);
     }
     int t = 0;*/
-    foe(pwh, to_polygon_vector(s)) {
+    foe(_pwh, to_polygon_vector(s)) {
 
-        //debug(pwh.number_of_holes());
-        //foe(p, pwh.outer_boundary()) debug(p);
-        //int ttt = 0;
+        auto pwh = _pwh;
 
-        auto sum = CGAL::minkowski_sum_2(pwh, pol);
+        /*auto t = Polygon_set(pwh);
+        bool is_inf_outerboundary = area(t) < FT(0); // meaning it has an infinite outer boundary
+        FT inf = 1e30;
+        Polygon square; square.pb(Point(-inf,-inf));square.pb(Point(inf,-inf));square.pb(Point(inf,inf));square.pb(Point(-inf,inf));
+        if(is_inf_outerboundary) { // meaning it has an infinite outer boundary
+            Polygon_set p (pwh);
+            p.intersection(square);
+            assert(p.number_of_polygons_with_holes() == 1);
+            pwh = to_polygon_vector(p)[0];
+            debug("here");
+        }
+        debug(area(t));
+        t = Polygon_set(pwh);
+        debug(area(t));*/
 
-        /*foe(p, sum.outer_boundary()) {
-            debug(p);
+        auto _sum = CGAL::minkowski_sum_2(pwh, pol);
+        Polygon_set sum (_sum);
+        /*if(is_inf_outerboundary) {
+            sum.join(get_complement(Polygon_set(square))); // remove the extra outer part coming from the square
         }*/
-        /*debug(sum.number_of_holes());
-        foe(h, sum.holes()) debug(h.area());*/
 
+        debug(area(sum));
         space.join(sum);
     }
+    debug(area(space));
     space.complement();
+    debug(area(space));
 }
 
 Polygon ConfigurationSpace::get_single_polygon() {

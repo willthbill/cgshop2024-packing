@@ -82,7 +82,7 @@ public:
         // -->
         // scale < sqrt((biginf - 10000) / (1.1 * 1.1 * 1.3 * 1.3)) / mx
 
-        scale = ceil_exact(mx / (FT(sqrt(biginf.to_double()))) / 0.4 / 0.935);
+        scale = ceil_exact(mx / (FT(sqrt(biginf.to_double()))) / 0.4 / 0.8); //0.935);
         assert(scale >= -0.00001);
         if(scale <= 1) scale = 1;
         scale = FT(1)/FT(scale);
@@ -93,6 +93,7 @@ public:
 
         mx = ceil((mx * scale.to_double()).to_double());
         inf = ceil((100 + mx * 2.5).to_double()); // upper bound on coordinates
+        debug(inf);
         assert(inf > 0);
         assert(mx > 0);
         assert(mx * 2.5 < inf);
@@ -214,13 +215,16 @@ public:
                     item2.pol,
                     item2.get_reference_point()
                 ).space;
+                debug(config_space.is_valid());
                 // Snap it to a grid
                 config_space_int = get_complement(
                     SnapToGrid(get_complement(config_space)).space
                 ); // TODO: taking complement twice
+                debug(config_space_int.is_valid());
             }
 
             // Computer intersection of large square and completement of configuration space
+            // TODO: why are we doing this??????
             Polygon square = get_big_square();
             Polygon_set ps (square);
             ps.intersection(config_space_int);
@@ -311,11 +315,11 @@ public:
             auto t = Polygon_set(pwh);
             auto unfixed_container = get_single_polygon(t); // it cannot have holes
             foe(container, fix_repeated_points(unfixed_container)) {
-                debug("container");
+                /*debug("container");
                 foe(p, container) {
                     debug(p);
                 }
-                debug("container end");
+                debug("container end");*/
                 // cout << "Original container area: " << container.area().to_double() << endl;
                 Polygon_set scaled_container;
                 {
@@ -351,19 +355,19 @@ public:
         };
         foe(item, modified_input.items) {
             auto old = item.pol;
-            debug("begin item");
+            /*debug("begin item");
             foe(p, old) {
                 debug(p);
             }
-            debug("end item");
+            debug("end item");*/
             auto old_ref = item.get_reference_point();
             foe(p, old) {
                 assert(p.x() >= 0);
                 assert(p.y() >= 0);
             }
-            cout << "Original item area: " << item.pol.area().to_double() << endl;
+            //cout << "Original item area: " << item.pol.area().to_double() << endl;
             item.pol = SnapToGrid(Polygon_set(item.pol)).get_single_polygon();
-            cout << "Snapped item area: " << item.pol.area().to_double() << endl;
+            //cout << "Snapped item area: " << item.pol.area().to_double() << endl;
             assert(is_completely_inside(Polygon_set(item.pol), Polygon_set(old)));
             Vector ref_translation = item.get_reference_point() - old_ref;
             assert(is_integer(item.get_reference_point().x()));
@@ -412,6 +416,70 @@ public:
         return res;
     }
     void add_constraints_inside_polygon_set(
+        Polygon_set& pset,
+        ItemsContainer& items,
+        vector<MIPVariable>& in_use_binaries,
+        vector<pair<MIPVariable,MIPVariable>>& xy_ref_variables
+    ) {
+        fon(i, sz(items)) {
+            auto& item = items[i];
+            vector<Polygon> partition;
+            {
+                // Compute configuration space
+                Polygon_set disallowed = get_complement(pset);
+                debug(area(pset));
+                auto config_space = ConfigurationSpace(
+                    disallowed,
+                    item.pol,
+                    item.get_reference_point()
+                ).space;
+                debug(config_space.is_valid());
+                debug(area(config_space));
+
+                // Snap it to a grid
+                auto config_space_int = get_complement(
+                    SnapToGrid(get_complement(config_space)).space
+                ); // TODO: taking complement twice
+                debug(config_space_int.is_valid());
+                debug(area(config_space_int));
+
+                partition = ConvexCover::get_convex_cover(config_space_int);
+                debug(sz(partition));
+            }
+            vector<MIPVariable> all_tmp_binaries;
+            fon(idx, sz(partition)) {
+                assert_is_integer_polygon(partition[idx]);
+                vector<MIPVariable> binaries = {in_use_binaries[i]};
+                MIPVariable var = {"bin", "polygon_set_binary_" + to_string(i) + "_" + to_string(idx)}; // TODO: must be unique
+                add_variable(var);
+                binaries.push_back(var);
+
+                all_tmp_binaries.push_back(var); // TODO
+
+                // add_constraints_inside_convex_polygon(cover[idx], items, binaries, xy_ref_variables);
+                auto& x = xy_ref_variables[i].fi;
+                auto& y = xy_ref_variables[i].se;
+                auto ref = item.get_reference_point();
+                foe(constraint, get_constraints_point_inside_convex_polygon(
+                    partition[idx], x, y, binaries, Vector(0,0)
+                )) {
+                    add_constraint(constraint);
+                }
+            }
+            // At least one convex region
+            vector<pair<string,FT>> terms;
+            foe(b, all_tmp_binaries) terms.push_back({b.se,1});
+            terms.push_back(make_pair(in_use_binaries[i].se, -(max_partition_size + 100ll))); // TODO: do we need this? not really right?
+            assert(sz(terms) < max_partition_size - 1000);
+            add_constraint({
+                terms,
+                "geq",
+                1ll - (max_partition_size + 100ll)
+            });
+        }
+    }
+    // NOT WORKING
+    void _add_constraints_inside_polygon_set(
         Polygon_set& pset,
         ItemsContainer& items,
         vector<MIPVariable>& in_use_binaries,
@@ -842,9 +910,15 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         cout << "[c++] WARNING: Container area is 0" << endl;
         return PackingInput(_input);
     }
-    initial.items = helper.scale_items(initial.items);
+    initial.items = helper.scale_items(initial.items); // TODO: check if any has area 0
     initial = HeuristicPackingNOMIP().run(input, false, 0); // TODO: 0 or 1?
     debug(initial.get_score());
+
+    foe(item, input.items) {
+        if(item.pol.area() < 1) {
+            cout << "[c++] WARNING: Item area is 0" << endl;
+        }
+    }
 
     auto in_use_binaries = helper.get_and_add_in_use_binaries(sz(input.items));
     auto xys = helper.get_and_add_xy_ref_variables(sz(input.items));
@@ -860,9 +934,24 @@ PackingOutput OptimalRearrangement::run(PackingInput _input, PackingOutput initi
         cout << "[c++] Adding items inside container constraints" << endl;
         Polygon_set allowed_space;
         foe(pwh, to_polygon_vector(input.container)) {
+            assert(pwh.number_of_holes() == 0);
             foe(pol, fix_repeated_points(pwh.outer_boundary())) {
-                allowed_space.join(pol);
+                // TODO: could have extra binaries here for each polygon
+                debug("POL");
+                foe(p, pol) {
+                    debug(p);
+                }
+                debug("END POL");
+                allowed_space.join(pol); // thats stupid!
             }
+        }
+        debug("END BUILDING ALLOWED SPACE");
+        foe(item, input.items) {
+            debug("ITEM");
+            foe(p, item.pol) {
+                debug(p);
+            }
+            debug("END ITEM");
         }
         helper.add_constraints_inside_polygon_set(
             allowed_space,

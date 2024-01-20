@@ -296,6 +296,13 @@ vector<Polygon_set> HeuristicPackingHelpers::overlay_grid(Polygon_set& container
     return containers;
 }
 
+const string SAMPLING_METHOD = "median_0.2";
+/*
+best_mcc
+best_total
+median_0.2
+*/
+
 ////// ADVANCED ITEMS CONTAINER ///////
 FT AdvancedItemsContainer::sorting_metric(int idx) {
     return items[idx].value / item_areas[idx];
@@ -313,7 +320,7 @@ AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
         sort(item_areas_copy.begin(), item_areas_copy.end());
         median_item_area = item_areas_copy[(int)(sz(item_areas_copy) * 0.2)];
     }
-    {
+    if(SAMPLING_METHOD == "median_0.2") {
         buckets.push_back({{0,median_item_area}, ordered_set_rev<pair<FT,int>>()});
         buckets.push_back({{median_item_area, FT(1e100)}, ordered_set_rev<pair<FT,int>>()});
         fon(i, sz(items)) {
@@ -325,17 +332,19 @@ AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
         }
     }
 
-    /*auto tbuckets = buckets;
-    {
-        double f = 1.2; // TODO: test different
-        double a = f;
-        double pa = 0;
-        while(pa <= 1e30) {
-            buckets.push_back({{FT(pa - 0.01), FT(a + 0.01)}, ordered_set_rev<pair<FT,int>>()});
-            pa = a;
-            a *= f;
+    auto tbuckets = buckets;
+    if(SAMPLING_METHOD == "best_mcc" || SAMPLING_METHOD == "best_total") {
+        {
+            double f = 1.2; // TODO: test different
+            double a = f;
+            double pa = 0;
+            while(pa <= 1e30) {
+                buckets.push_back({{FT(pa - 0.01), FT(a + 0.01)}, ordered_set_rev<pair<FT,int>>()});
+                pa = a;
+                a *= f;
+            }
         }
-    }*/
+    }
 
     total_area_packed = accumulate(item_areas.begin(), item_areas.end(), FT(0));
     fon(i, sz(items)) {
@@ -344,13 +353,15 @@ AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
 
     ASSERT(total_area_packed == FT(0),"");
 
-    // Just to remove unused buckets
-    /*foe(bucket, buckets) {
-        if(sz(bucket.se)) {
-            tbuckets.push_back(bucket);
+    if(SAMPLING_METHOD == "best_mcc" || SAMPLING_METHOD == "best_total") {
+        // Just to remove unused buckets
+        foe(bucket, buckets) {
+            if(sz(bucket.se)) {
+                tbuckets.push_back(bucket);
+            }
         }
+        buckets = tbuckets;
     }
-    buckets = tbuckets;*/
 }
 int AdvancedItemsContainer::size() {
     return sz(available_items);
@@ -373,11 +384,11 @@ int AdvancedItemsContainer::get_bucket_for_area_container(FT area) {
     return bidx;
 }
 vector<int> AdvancedItemsContainer::get_buckets_for_area_item(FT item_area) {
-    {
+    if(SAMPLING_METHOD == "median_0.2") {
         if(item_area > median_item_area) return {1};
         else return {0};
     }
-    /*{
+    if(SAMPLING_METHOD == "best_mcc" || SAMPLING_METHOD == "best_total") {
         FT min_area_container = item_area * FT(1);
         FT max_area_container = FT(1e100);
         /*if(item_area / largest_item_area > 0.5) {
@@ -388,14 +399,14 @@ vector<int> AdvancedItemsContainer::get_buckets_for_area_item(FT item_area) {
                 item_area * 20
             );
         }*/
-    /*^    int min_bidx = get_bucket_for_area_container(min_area_container);
+        int min_bidx = get_bucket_for_area_container(min_area_container);
         int max_bidx = get_bucket_for_area_container(max_area_container);
         vector<int> res;
         for(int i = min_bidx; i <= max_bidx; i++) {
             res.push_back(i);
         }
         return res;
-    }*/
+    }
 }
 void AdvancedItemsContainer::add_item(int idx) {
     avg_area = (avg_area * FT(size()) + item_areas[idx]) / FT(size() + 1);
@@ -565,7 +576,7 @@ pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(in
 ///////////////////////
 
 ////// PARAMS ///////
-const int MAX_ITEMS_IN_PACKING = 1500;
+const int MAX_ITEMS_IN_PACKING = 10000;
 ///////////////////////
 
 
@@ -685,22 +696,40 @@ void HeuristicPackingRecursive::solve(
             ),
             20
         );
-        /*auto [sampled_items, indices] = items.extract_items_bucket_sampling(
-            to_sample,
-            area(container), // get_area_of_largest_convex_cover_piece(container),
-            original_container_area
-        );*/
-        auto [sampled_items, indices] = items.extract_items_median_sampling(
-            to_sample,
-            depth,
-            original_container_area,
-            area(container)
-        );
-        if(sz(sampled_items)) {
+        ItemsContainer sampled_items; vector<int> indices;
+        if(SAMPLING_METHOD == "best_mcc") {
+            auto p = items.extract_items_bucket_sampling(
+                to_sample,
+                get_area_of_largest_convex_cover_piece(container),
+                original_container_area
+            );
+            sampled_items = p.fi;
+            indices = p.se;
+        }
+        if(SAMPLING_METHOD == "best_total") {
+            auto p = items.extract_items_bucket_sampling(
+                to_sample,
+                area(container),
+                original_container_area
+            );
+            sampled_items = p.fi;
+            indices = p.se;
+        }
+        if(SAMPLING_METHOD == "median_0.2") {
+            auto p = items.extract_items_median_sampling(
+                to_sample,
+                depth,
+                original_container_area,
+                area(container)
+            );
+            sampled_items = p.fi;
+            indices = p.se;
+        }
+        /*if(sz(sampled_items)) {
             debug(sz(sampled_items), sampled_items.get_average_area().to_double(), depth);
         } else {
             debug("no items", depth);
-        }
+        }*/
         /*foe(item, sampled_items) {
             ASSERT(item.pol.area() <= area(container),"");
         }*/
@@ -837,8 +866,15 @@ void HeuristicPackingRecursive::solve(
         - try just minimizing sum of y or x (with fixed x/y) for faster
         - kør fase 1 og 2 igen og igen
         - what if before MIP we are not able to place all items. crash?
-    
-    - improve the small instances a lot more
+        - use density
+        - Repack around holes
+        - use try statement so that a small error does not ruin all progress
+
+    - Value / convex hull?
+    - Improve the small instances a lot more
+    - Use different parameters for different instances
+    - Try median method with other than 0.2
+    - Try this?: https://github.com/tamasmeszaros/libnest2d
 */
 
 // TODO: speed up by only duplicating polygons as many times as the total area is less than area of container
