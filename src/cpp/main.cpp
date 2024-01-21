@@ -77,7 +77,7 @@ OUT_TYPE heuristic_algorithm(IN_TYPE input) {
     // return HeuristicPackingNOMIP().run(input);
     // return HeuristicPackingGrid().run(input);
     // return HeuristicPackingRecursive().run(input);
-    return HeuristicPackingMultiple().run(input,100,0);
+    return HeuristicPackingMultiple().run(input,100000,0);
 }
 
 OUT_TYPE heuristic_repacking_algorithm(IN_TYPE input, OUT_TYPE output) {

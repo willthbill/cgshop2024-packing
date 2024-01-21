@@ -20,6 +20,39 @@
 
 using namespace std;
 
+vector<Segment> get_segments(Polygon& pol) {
+    vector<Segment> res;
+    for (auto v = pol.vertices_begin(); v != pol.vertices_end(); ++v) {
+        Segment seg(*v, *(next(v) == pol.vertices_end() ? pol.vertices_begin() : next(v))); // TODO: does this actually work
+        res.push_back(seg);
+    }
+    //Segment seg(pol[sz(pol)-1], pol[0]); // TODO: necessary?
+    //res.push_back(seg);
+    return res;
+}
+
+FT find_min_distance(const Polygon_with_holes& pol, const Point& p) {
+    FT minDist = 1e100;
+    auto process_seg = [&](Segment& s) {
+        FT dist = CGAL::squared_distance(s, p);
+        if (dist < minDist) {
+            minDist = dist;
+        }
+    };
+    auto process_pol = [&](Polygon& pol) {
+        foe(seg, get_segments(pol)) {
+            process_seg(seg);
+        }
+    };
+    auto bound = pol.outer_boundary();
+    process_pol(bound);
+    foe(hole, pol.holes()) {
+        Polygon thole = hole;
+        process_pol(thole);
+    }
+    return std::sqrt(CGAL::to_double(minDist));
+}
+
 PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider, int sort_type) {
     auto input = _input;
     input.items = input.items.expand();
@@ -32,8 +65,9 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
     input.items = permute(input.items, sorted_idxs);
 
     Polygon_set existing = get_complement(input.container);
+    Polygon_set free_space = input.container;
     int number_of_included_items = 0;
-    vector<FT> weights = {1,0,0.5,0.1};
+    vector<FT> weights = {1,1,0,0,0};
     fon(i, sz(weights)) {
         cout << "[c++] Weight[" << i << "]: " << weights[i] << endl;
     }
@@ -64,52 +98,114 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
         return voa;
     };
 
-    auto get_fitness = [&](Polygon& pol, Polygon_set& p) -> FT {
+    auto get_fitness = [&](Polygon pol, Polygon_set& pset) -> FT {
+        const int TOTAL_POINTS = 40;
+        Polygon_with_holes pwh;
+        pset.locate(get_centroid(pol), pwh);
+        FT total_length = 0;
+        auto segments = get_segments(pol);
+        foe(seg, segments) {
+            total_length += sqrt(seg.squared_length().to_double());
+        }
+        vector<FT> mndistances;
+        foe(seg, segments) {
+            FT len = sqrt(seg.squared_length().to_double());
+            auto dir = seg.to_vector() / len;
+            int to_get = (int)(round((len / total_length * TOTAL_POINTS).to_double())) + 1; // TODO: maybe not +1?
+            FT for_each = len / to_get;
+            auto p = seg.source();
+            rep(to_get) {
+                FT mnd = find_min_distance(pwh, p);
+                mndistances.push_back(mnd);
+                p = p + dir * for_each;
+            }
+        }
+        assert(sz(mndistances) >= TOTAL_POINTS * 0.8);
+        int window = (sz(mndistances) + 1) * 0.5;
+        assert(window >= 0);
+        assert(window <= sz(mndistances));
+        FT cur = 0;
+        fon(i, window) {
+            cur += mndistances[i];
+        }
+        FT res = cur;
+        int n = sz(mndistances);
+        foab(i, window, n * 3) {
+            cur -= mndistances[(i - window + 10 * n) % n];
+            cur += mndistances[i % n];
+            res = min(res, cur);
+        }
+        auto _t = Polygon_set(pwh);
+        return res / window / sqrt(area(_t).to_double());
+
+        /*assert(sz(mndistances) >= TOTAL_POINTS * 0.8);
+        sort(all(mndistances));
+        int half = (sz(mndistances) + 1) * 0.25;
+        assert(half >= 0);
+        FT res = 0;
+        fon(i, half) {
+            res += mndistances[i];
+        }
+        return res / half;*/
     };
 
-    auto get_best_point_in_config_space = [&](Polygon_set& config_space) -> pair<FT,Point> {
-        vector<pair<FT,Point>> vertices;
+    auto get_best_point_in_config_space = [&](Item& item, Polygon_set& config_space) -> tuple<FT,FT,Point> {
+        vector<tuple<FT,FT,Point>> vertices;
         foe(pwh, to_polygon_vector(config_space)) {
             auto _t = Polygon_set(pwh);
             FT carea = area(_t).to_double(); // TODO: sqrt or not?
-            foe(p, pwh.outer_boundary()) vertices.push_back({carea, p});
-            foe(hole, pwh.holes()) foe(p, hole) vertices.push_back({carea, p});
+            // foe(p, pwh.outer_boundary()) vertices.push_back({carea, p});
+            // foe(hole, pwh.holes()) foe(p, hole) vertices.push_back({carea, p});
+            foe(p, pwh.outer_boundary()) {
+                vertices.push_back({
+                    carea,
+                    get_fitness(item.move_ref_point(p).pol, free_space)// / sqrt(carea.to_double())
+                , p});
+            }
+            foe(hole, pwh.holes()) foe(p, hole) {
+                vertices.push_back({
+                    carea,
+                    get_fitness(item.move_ref_point(p).pol, free_space)// / sqrt(carea.to_double())
+                , p});
+            }
         }
         // TODO: is sorting to much wasted time? Maybe just find the lowest point
-        sort(vertices.begin(), vertices.end(), [](pair<FT,Point>& a, pair<FT,Point>& b) {
-            auto carea_a = a.first, x_a = a.second.x(), y_a = a.second.y();
-            auto carea_b = b.first, x_b = b.second.x(), y_b = b.second.y();
+        sort(vertices.begin(), vertices.end(), [](tuple<FT,FT,Point>& a, tuple<FT,FT,Point>& b) {
+            auto carea_a = get<0>(a), x_a = get<2>(a).x(), y_a = get<2>(a).y();
+            auto carea_b = get<0>(b), x_b = get<2>(b).x(), y_b = get<2>(b).y();
             if(carea_a == carea_b) {
-                if(y_a == y_b) return x_a < x_b;
+                if(y_a == y_b) return x_a < x_b; // TODO: IMPORTANT! dont take into account x and y. the fitness!!!! or not?
                 return y_a < y_b;
             }
             return carea_a < carea_b;
         });
         if(sz(vertices)) {
             foe(t, vertices) {
-                auto [carea, v] = t;
+                auto [carea, fit, v] = t;
                 foab(dy, -2, 5) foab(dx, -2, 5) {
                     Point p (floor_exact(v.x() + dx), floor_exact(v.y() + dy));
                     if(config_space.oriented_side(p) != CGAL::ON_NEGATIVE_SIDE) {
-                        return {carea, p};
+                        return {carea, fit, p};
                     }
                 }
             }
             assert(false);
         }
-        return {-1,{0,0}};
+        return {-1,-1,{0,0}};
     };
 
-    auto get_info = [&](int idx, Polygon_set& config_space) -> tuple<FT,FT,Point> {
+    auto get_info = [&](int idx, Polygon_set& config_space) -> tuple<FT,FT,FT,Point> {
+        auto& item = input.items[idx];
         auto voa = get_voa(idx);
-        auto [carea, p] = get_best_point_in_config_space(config_space);
-        return {carea, voa, p};
+        auto [carea, fit, p] = get_best_point_in_config_space(item, config_space);
+        return {carea, fit, voa, p};
     };
 
     auto get_best_item_info = [&](set<tuple<vector<FT>,Point,int>> items_info) -> tuple<vector<FT>,Point,int> {
         vector<FT> mns (sz(weights), 1e100), mxs (sz(weights), -1e100);
         foe(t, items_info) {
             auto v = get<0>(t);
+            assert(sz(v) == sz(weights));
             fon(i, sz(weights)) {
                 mns[i] = min(mns[i], v[i]);
                 mxs[i] = max(mxs[i], v[i]);
@@ -140,9 +236,11 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
     // TODO: if the same item is preset multiple times we don't need to recompue config space
     // TODO: consider that the confie space area should we multiplied by the area of the item?
     // TODO: product of value and fitness --> how good a fit in total. could be computed within the weighted average thing
+    // TODO: take into account the actual area of the pwh (not the one from the config space)
     int idx = 0;
     set<int> items_to_consider;
     while(true) {
+
 
         map<int,Polygon_set> config_spaces;
 
@@ -177,10 +275,10 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
         // Compute metrics of items to consider
         set<tuple<vector<FT>,Point,int>> items_info;
         foe(idx, items_to_consider) {
-            auto [carea, voa, p] = get_info(idx, config_spaces[idx]);
+            auto [carea, fit, voa, p] = get_info(idx, config_spaces[idx]);
             // auto& item = input.items[idx];
             // items_info.insert({{sqrt(carea.to_double()) * sqrt(item.pol.area().to_double()), -voa, p.y(), p.x()}, p, idx}); // should always minimize
-            items_info.insert({{carea, -voa, p.y(), p.x()}, p, idx}); // should always minimize
+            items_info.insert({{carea, fit, -voa, p.y(), p.x()}, p, idx}); // should always minimize
         }
 
         auto best = get_best_item_info(items_info);
@@ -190,6 +288,7 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
         add_item(item, p);
         items_to_consider.erase(best_idx);
         existing.join(item.move_ref_point(p).pol); // TODO: just insert instead of join?
+        free_space.intersection(get_complement(Polygon_set(item.move_ref_point(p).pol))); // TODO: just insert instead of join?
         number_of_included_items++;
 
         debug(sz(items_info));
