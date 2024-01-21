@@ -34,6 +34,9 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
     Polygon_set existing;
     int number_of_included_items = 0;
     vector<FT> weights = {1,0,0.5,0.1};
+    fon(i, sz(weights)) {
+        cout << "[c++] Weight[" << i << "]: " << weights[i] << endl;
+    }
     PackingOutput output (_input);
     Polygon_set complement_of_container = get_complement(input.container);
 
@@ -132,6 +135,8 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
     // TODO: optimize by not recomputing config_spaces if they are still valid
     // TODO: the same item can be in the to_consider many times
     // TODO: if the same item is preset multiple times we don't need to recompue config space
+    // TODO: consider that the confie space area should we multiplied by the area of the item?
+    // TODO: product of value and fitness --> how good a fit in total. could be computed within the weighted average thing
     int idx = 0;
     set<int> items_to_consider;
     while(true) {
@@ -170,6 +175,8 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
         set<tuple<vector<FT>,Point,int>> items_info;
         foe(idx, items_to_consider) {
             auto [carea, voa, p] = get_info(idx, config_spaces[idx]);
+            // auto& item = input.items[idx];
+            // items_info.insert({{sqrt(carea.to_double()) * sqrt(item.pol.area().to_double()), -voa, p.y(), p.x()}, p, idx}); // should always minimize
             items_info.insert({{carea, -voa, p.y(), p.x()}, p, idx}); // should always minimize
         }
 
@@ -187,6 +194,10 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
         cout << "[c++] Last considered item: " << idx << " / " << sz(input.items) << endl;
         cout << "[c++] Number of included items: " << number_of_included_items << " / " << idx << endl;
         cout << "[c++] Score: " << output.get_score() << endl;
+    }
+
+    fon(i, sz(weights)) {
+        cout << "[c++] Weight[" << i << "]: " << weights[i] << endl;
     }
 
     return output;
