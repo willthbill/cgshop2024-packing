@@ -33,7 +33,7 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
 
     Polygon_set existing;
     int number_of_included_items = 0;
-    vector<FT> weights = {1,0,0,0};
+    vector<FT> weights = {1,0,0.5,0.1};
     PackingOutput output (_input);
     Polygon_set complement_of_container = get_complement(input.container);
 
@@ -65,7 +65,7 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
         vector<pair<FT,Point>> vertices;
         foe(pwh, to_polygon_vector(config_space)) {
             auto _t = Polygon_set(pwh);
-            FT carea = area(_t);
+            FT carea = area(_t).to_double(); // TODO: sqrt or not?
             foe(p, pwh.outer_boundary()) vertices.push_back({carea, p});
             foe(hole, pwh.holes()) foe(p, hole) vertices.push_back({carea, p});
         }
@@ -100,10 +100,8 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
         return {carea, voa, p};
     };
 
-    auto get_best_item_info = [&]() -> tuple<vector<FT>,Point,int> {
-        debug("yo3.1");
+    auto get_best_item_info = [&](set<tuple<vector<FT>,Point,int>> items_info) -> tuple<vector<FT>,Point,int> {
         vector<FT> mns (sz(weights), 1e100), mxs (sz(weights), -1e100);
-        debug("yo3.2");
         foe(t, items_info) {
             auto v = get<0>(t);
             fon(i, sz(weights)) {
@@ -111,12 +109,10 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
                 mxs[i] = max(mxs[i], v[i]);
             }
         }
-        debug("yo3.3");
         FT best_score = -1e100;
         tuple<vector<FT>,Point,int> best_item_info;
         foe(t, items_info) {
             FT score = 0;
-            debug("yo3.4");
             fon(i, sz(weights)) {
                 FT w = weights[i];
                 FT v = get<0>(t)[i];
@@ -125,57 +121,72 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
                 if(mn == mx) continue;
                 score += w * (1 - (v - mn) / (mx - mn));
             }
-            debug("yo3.5");
             if(score > best_score) {
                 best_score = score;
                 best_item_info = t;
             }
         }
-        debug("yo3.6");
         return best_item_info;
     };
 
     // TODO: optimize by not recomputing config_spaces if they are still valid
     // TODO: the same item can be in the to_consider many times
+    // TODO: if the same item is preset multiple times we don't need to recompue config space
     int idx = 0;
-    debug("yo1");
     set<int> items_to_consider;
     while(true) {
-        debug("yo2");
-        set<tuple<vector<FT>,Point,int>> items_info;
-        while(idx < sz(input.items) && sz(items_info) < to_consider) {
+
+        map<int,Polygon_set> config_spaces;
+
+        // Remove items that no longer fit
+        set<int> new_items_to_consider;
+        foe(idx, items_to_consider) {
             auto config_space = get_config_space(idx);
-            if(area(config_space) == 0) { // item cannot be placed
+            if(sz(to_polygon_vector(config_space)) == 0) {// config_space.is_empty() //area(config_space) == 0) { // item cannot be placed
+                continue;
+            }
+            config_spaces[idx] = config_space;
+            new_items_to_consider.insert(idx);
+        }
+        items_to_consider = new_items_to_consider;
+        
+        // Update set of items to consider
+        while(idx < sz(input.items) && sz(items_to_consider) < to_consider) {
+            auto config_space = get_config_space(idx);
+            if(sz(to_polygon_vector(config_space)) == 0) {
                 idx++;
                 continue;
             }
-            auto [carea, voa, p] = get_info(idx, config_space);
-            items_info.insert({{carea, -voa, p.y(), p.x()}, p, idx}); // should always minimize
+            config_spaces[idx] = config_space;
+            items_to_consider.insert(idx);
             idx++;
         }
-        if(idx == sz(input.items)) break;
-        debug("yo3");
-
-        auto best = get_best_item_info();
-        debug("yo4");
-        auto& item = input.items[get<2>(best)];
-        debug("yo5");
-        auto& p = get<1>(best);
-        debug("yo6");
-        debug(p);
-        add_item(item, p);
-        debug("yo6.5");
-        items_info.erase(best);
-        debug("yo7");
-        existing.join(item.move_ref_point(p).pol); // TODO: just insert instead of join?
-        debug("yo8");
-        number_of_included_items++;
-
-        debug("yo9");
-        debug(sz(items_info));
-        if(idx == sz(input.items) && sz(items_info) == 0) {
+        if(sz(items_to_consider) == 0) {
+            assert(idx == sz(input.items));
             break;
         }
+
+        // Compute metrics of items to consider
+        set<tuple<vector<FT>,Point,int>> items_info;
+        foe(idx, items_to_consider) {
+            auto [carea, voa, p] = get_info(idx, config_spaces[idx]);
+            items_info.insert({{carea, -voa, p.y(), p.x()}, p, idx}); // should always minimize
+        }
+
+        auto best = get_best_item_info(items_info);
+        int best_idx = get<2>(best);
+        auto& item = input.items[best_idx];
+        auto& p = get<1>(best);
+        add_item(item, p);
+        items_to_consider.erase(best_idx);
+        existing.join(item.move_ref_point(p).pol); // TODO: just insert instead of join?
+        number_of_included_items++;
+
+        debug(sz(items_info));
+
+        cout << "[c++] Last considered item: " << idx << " / " << sz(input.items) << endl;
+        cout << "[c++] Number of included items: " << number_of_included_items << " / " << idx << endl;
+        cout << "[c++] Score: " << output.get_score() << endl;
     }
 
     return output;

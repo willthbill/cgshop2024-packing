@@ -14,8 +14,8 @@ def find_solution_json_files(directories):
 
 
 DEV="DEV" in os.environ and os.environ["DEV"] == "1"
-match_input_path=os.environ["MATCH_INPUT_PATH"] if "MATCH_INPUT_PATH" in os.environ else "input/cg24"
-match_output_path=os.environ["MATCH_OUTPUT_PATH"] if "MATCH_OUTPUT_PATH" in os.environ else "output/runs"
+match_input_path=os.environ["MATCH_INPUT_PATH"] if "MATCH_INPUT_PATH" in os.environ else None#"input/cg24"
+match_output_path=os.environ["MATCH_OUTPUT_PATH"] if "MATCH_OUTPUT_PATH" in os.environ else None #"output/runs"
 solution_files = find_solution_json_files(["output/runs"] + (["/tmp/runs"] if DEV else []))
 print(len(solution_files), "solutions found\n")
 
@@ -28,10 +28,11 @@ for file in solution_files:
         names[name] = []
     names[name].append((metadata))
 
-_names = list(names.keys())
-for name in _names:
-    if not any(match_input_path in e["input_filename"] for e in names[name]):
-        del names[name]
+if match_input_path is not None:
+    _names = list(names.keys())
+    for name in _names:
+        if not any(match_input_path in e["input_filename"] for e in names[name]):
+            del names[name]
 
 best_filenames = []
 average_rel_worst = 0
@@ -42,7 +43,7 @@ for name in names:
     names[name].sort(key=lambda x: x["score"], reverse=True)
     worst = names[name][-1]["score"]
     best_of_all = names[name][0]["score"]
-    names[name] = list(filter(lambda x: match_output_path in x["output_filename"], names[name]))
+    names[name] = list(filter(lambda x: (match_output_path is None) or (match_output_path in x["output_filename"]), names[name]))
     if len(names[name]) == 0:
         continue
     scores = [d["score"] for d in names[name]]
