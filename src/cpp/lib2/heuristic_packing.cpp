@@ -31,14 +31,14 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
     }
     input.items = permute(input.items, sorted_idxs);
 
-    Polygon_set existing;
+    Polygon_set existing = get_complement(input.container);
     int number_of_included_items = 0;
     vector<FT> weights = {1,0,0.5,0.1};
     fon(i, sz(weights)) {
         cout << "[c++] Weight[" << i << "]: " << weights[i] << endl;
     }
     PackingOutput output (_input);
-    Polygon_set complement_of_container = get_complement(input.container);
+    // Polygon_set complement_of_container = get_complement(input.container);
 
     auto add_item = [&](Item& item, Point p) {
         assert(is_integer(p.x()));
@@ -49,10 +49,10 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
 
     auto get_config_space = [&](int idx) {
         auto& item = input.items[idx];
-        Polygon_set disallowed_space = complement_of_container;
-        disallowed_space.join(existing);
+        //Polygon_set disallowed_space = complement_of_container;
+        //disallowed_space.join(existing);
         auto config_space = ConfigurationSpace(
-            disallowed_space,
+            existing,
             item.pol,
             item.get_reference_point()
         ).space;
@@ -62,6 +62,9 @@ PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider
     auto get_voa = [&](int idx) {
         FT voa = input.items[idx].value / input.items[idx].pol.area();
         return voa;
+    };
+
+    auto get_fitness = [&](Polygon& pol, Polygon_set& p) -> FT {
     };
 
     auto get_best_point_in_config_space = [&](Polygon_set& config_space) -> pair<FT,Point> {
