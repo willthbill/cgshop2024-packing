@@ -365,7 +365,8 @@ vector<Polygon_set> HeuristicPackingHelpers::overlay_grid(Polygon_set& container
     return containers;
 }
 
-const string SAMPLING_METHOD = "median_0.2";
+// const string SAMPLING_METHOD = "median_0.2";
+const string SAMPLING_METHOD = "best_mcc";
 /*
 best_mcc
 best_total
@@ -645,12 +646,16 @@ pair<ItemsContainer,vector<int>> AdvancedItemsContainer::extract_items_random(in
 ///////////////////////
 
 ////// PARAMS ///////
-const int MAX_ITEMS_IN_PACKING = 10000;
+const int MAX_ITEMS_IN_PACKING = 5000;
 ///////////////////////
 
 
 ////// HEURISTIC PACKING RECURSIVE ///////
 PackingOutput HeuristicPackingRecursive::run(PackingInput _input) {
+    if(sz(_input.items) == 0) {
+        PackingOutput t (_input);
+        return t;
+    }
     auto input = _input;
     input.items = input.items.expand();
     vector<int> item_indices;

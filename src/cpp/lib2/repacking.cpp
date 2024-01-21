@@ -101,7 +101,7 @@ public:
     }
 };
 
-const int MAX_ITEMS_IN_PACKING = 1000; // TODO: this should be big enough
+const int MAX_ITEMS_IN_PACKING = 60; // TODO: this should be big enough
 
 PackingOutput HeuristicRepacking::run(PackingInput _input, PackingOutput _initial) {
     // Expand input
@@ -146,7 +146,7 @@ struct IgnoreSecondComparator {
     }
 };
 
-Polygon_with_holes expand(Polygon& pol, FT scale) {
+/*Polygon_with_holes expand(Polygon& pol, FT scale) {
     Polygon square;
     FT factor = 0.5;
     {
@@ -157,7 +157,7 @@ Polygon_with_holes expand(Polygon& pol, FT scale) {
     }
     auto sum = CGAL::minkowski_sum_2(pol, square);
     return sum;
-}
+}*/
 
 PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial) {
     FT average_item_area = input.items.get_average_area();
@@ -240,12 +240,11 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
 
     cout << "[c++] INITIAL SCORE: " << score << endl;
     bool first_it = true;
-    //while(first_it || sz(available_items) > 0) {
-    rep(1) {
-        first_it = false;
+    while(first_it || sz(repacking_spaces) > 0) {
+    // rep(1) {
 
         // Generate repacking spaces
-        if(sz(repacking_spaces) == 0) {
+        if(first_it && sz(repacking_spaces) == 0) {
             cout << "[c++] Generating spaces to repack" << endl;
             FT square_size = sqrt((FT(MAX_ITEMS_IN_PACKING) / FT(2) * average_item_area).to_double()) - 2;
             auto squares = HeuristicPackingHelpers().overlay_grid(
@@ -260,6 +259,8 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
                 // TODO: based on density and total area and maybe something with number of items and their areas
             }
         }
+        
+        FT prev_score = score;
 
         // Extract highest priority space to repack
         auto [priority, space] = repacking_spaces.top(); repacking_spaces.pop();
@@ -286,7 +287,8 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
                     if(comp_space.oriented_side(pol) != CGAL::ON_POSITIVE_SIDE) {
                         items_to_repack.push_back(idx);
                     } else {
-                        packed_space.join(expand(pol,10)); // TODO: maybe disable expand?
+                        //packed_space.join(expand(pol,10)); // TODO: maybe disable expand?
+                        packed_space.join(pol); // TODO: maybe disable expand?
                     }
                     checked.insert(idx);
                 }
@@ -305,29 +307,40 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
         }
         PackingInput tinput {space, items};
         // TODO: move to (0,0)
+        /*FT initial_score = 0;
         PackingOutput initial (tinput);
         fon(i, sz(items_to_repack)) {
             int idx = items_to_repack[i];
             auto& item = input.items[idx];
             Item new_item {item.value, 1, solution[idx], i, Vector(0,0)};
             initial.add_item(new_item);
+            initial_score += item.value;
         }
+        cout << "Score of items before rearranging: " << initial_score << endl;*/
 
         // Pack
-        // PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false, 1);
-        PackingOutput toutput = OptimalRearrangement().run(tinput, initial);
-
+        PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false, 1);
+        // PackingOutput toutput = HeuristicPackingRecursive().run(tinput);
+        // PackingOutput toutput = OptimalRearrangement().run(tinput, initial);
+        // TODO: use recursive?
         cout << "Number of items after rearranging:" << sz(toutput.items) << endl;
+        // cout << "Score of items after rearranging: " << toutput.get_score() << endl;
+        /*if(toutput.get_score() - initial_score < 0) {
+            cout << "Score decreased, not repacking" << endl;
+            continue;
+        }*/
 
         // Mark used items
-        set<int> is_used; // could be vector<bool>
+        /*set<int> is_used; // could be vector<bool>
         foe(item, toutput.items) {
             int idx = items_to_repack[item.idx];
             is_used.insert(idx);
-        }
+        }*/
 
         // Remove items to repack from the query util and solution
+        vector<Polygon> restore;
         foe(idx, items_to_repack) {
+            restore.push_back(solution[idx]);
             remove_from_solution(idx);
         }
         // Add items to solution
@@ -346,25 +359,41 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
             output,
             tpacked,
             area(space),
-            1 // TODO: 0?
+            0 // TODO: 0?
         );
-        // Add items to solution
         foe(item, output) {
             add_to_solution(item.idx, item.pol, true);
         }
+        if(prev_score > score) {
+            cout << "[c++] score decreased. restoring" << endl;
+            foe(item, output) {
+                remove_from_solution(item.idx);
+            }
+            foe(item, toutput.items) {
+                int idx = items_to_repack[item.idx];
+                remove_from_solution(idx);
+            }
+            fon(i, sz(items_to_repack)) {
+                int idx = items_to_repack[i];
+                add_to_solution(idx, restore[i], false);
+            }
+        }
+
         // Reset output
         output.items = ItemsContainer();
         output.item_count = {};
         output.score = 0;
 
         cout << "[c++] SCORE: " << score << endl;
+
+        first_it = false;
     }
 
     cout << "[c++] Repacking done" << endl;
+    cout << "[c++] SCORE: " << score << endl;
 
     // Construct output
     output = PackingOutput (input);
-    debug(sz(solution));
     foe(p, solution) {
         auto& idx = p.fi;
         auto& pol = p.se;
@@ -372,9 +401,9 @@ PackingOutput HeuristicRepacking::_run(PackingInput input, PackingOutput initial
         output.add_item(new_item);
     }
 
-    debug("returning");
-
     query_util.delete_datastructures();
+
+    debug("finished");
 
     return output;
 }
