@@ -1,18 +1,18 @@
 #include <bits/stdc++.h>
-#include <CGAL/Aff_transformation_2.h>
+//#include <CGAL/Aff_transformation_2.h>
 #include <CGAL/Boolean_set_operations_2.h>
-#include <CGAL/minkowski_sum_2.h>
+//#include <CGAL/minkowski_sum_2.h>
 
-#include "lib2/simplification.h"
-#include "lib2/convex_cover.cpp"
-#include "lib2/optimal_packing.h"
+//#include "lib2/simplification.h"
+//#include "lib2/convex_cover.cpp"
+//#include "lib2/optimal_packing.h"
 #include "lib2/heuristic_packing.h"
-#include "lib2/mip/gurobi.h"
+//#include "lib2/mip/gurobi.h"
 #include "lib2/configuration_space.h"
-#include "lib2/snap.h"
-#include "lib2/mip/mip.h"
+#//include "lib2/snap.h"
+//#include "lib2/mip/mip.h"
 #include "lib2/util.h"
-#include "lib/geometry/partition_constructor.h"
+//#include "lib/geometry/partition_constructor.h"
 #include "lib/util/geometry_utils.h"
 #include "lib/util/cgal.h"
 #include "lib/util/common.h"
@@ -20,7 +20,168 @@
 
 using namespace std;
 
-PackingOutput HeuristicPackingNOMIP_custom::run(
+PackingOutput HeuristicPackingMultiple::run(PackingInput _input, int to_consider, int sort_type) {
+    auto input = _input;
+    input.items = input.items.expand();
+    vector<int> sorted_idxs;
+    if(sort_type == 0) {
+        sorted_idxs = input.items.sort_by_value_over_area();
+    } else if(sort_type == 1) {
+        sorted_idxs = input.items.sort_by_area();
+    }
+    input.items = permute(input.items, sorted_idxs);
+
+    Polygon_set existing;
+    int number_of_included_items = 0;
+    vector<FT> weights = {1,0,0,0};
+    PackingOutput output (_input);
+    Polygon_set complement_of_container = get_complement(input.container);
+
+    auto add_item = [&](Item& item, Point p) {
+        assert(is_integer(p.x()));
+        assert(is_integer(p.y()));
+        Item new_item = item.move_ref_point(p);
+        output.add_item(new_item);
+    };
+
+    auto get_config_space = [&](int idx) {
+        auto& item = input.items[idx];
+        Polygon_set disallowed_space = complement_of_container;
+        disallowed_space.join(existing);
+        auto config_space = ConfigurationSpace(
+            disallowed_space,
+            item.pol,
+            item.get_reference_point()
+        ).space;
+        return config_space;
+    };
+
+    auto get_voa = [&](int idx) {
+        FT voa = input.items[idx].value / input.items[idx].pol.area();
+        return voa;
+    };
+
+    auto get_best_point_in_config_space = [&](Polygon_set& config_space) -> pair<FT,Point> {
+        vector<pair<FT,Point>> vertices;
+        foe(pwh, to_polygon_vector(config_space)) {
+            auto _t = Polygon_set(pwh);
+            FT carea = area(_t);
+            foe(p, pwh.outer_boundary()) vertices.push_back({carea, p});
+            foe(hole, pwh.holes()) foe(p, hole) vertices.push_back({carea, p});
+        }
+        // TODO: is sorting to much wasted time? Maybe just find the lowest point
+        sort(vertices.begin(), vertices.end(), [](pair<FT,Point>& a, pair<FT,Point>& b) {
+            auto carea_a = a.first, x_a = a.second.x(), y_a = a.second.y();
+            auto carea_b = b.first, x_b = b.second.x(), y_b = b.second.y();
+            if(carea_a == carea_b) {
+                if(y_a == y_b) return x_a < x_b;
+                return y_a < y_b;
+            }
+            return carea_a < carea_b;
+        });
+        if(sz(vertices)) {
+            foe(t, vertices) {
+                auto [carea, v] = t;
+                foab(dy, -2, 5) foab(dx, -2, 5) {
+                    Point p (floor_exact(v.x() + dx), floor_exact(v.y() + dy));
+                    if(config_space.oriented_side(p) != CGAL::ON_NEGATIVE_SIDE) {
+                        return {carea, p};
+                    }
+                }
+            }
+            assert(false);
+        }
+        return {-1,{0,0}};
+    };
+
+    auto get_info = [&](int idx, Polygon_set& config_space) -> tuple<FT,FT,Point> {
+        auto voa = get_voa(idx);
+        auto [carea, p] = get_best_point_in_config_space(config_space);
+        return {carea, voa, p};
+    };
+
+    auto get_best_item_info = [&]() -> tuple<vector<FT>,Point,int> {
+        debug("yo3.1");
+        vector<FT> mns (sz(weights), 1e100), mxs (sz(weights), -1e100);
+        debug("yo3.2");
+        foe(t, items_info) {
+            auto v = get<0>(t);
+            fon(i, sz(weights)) {
+                mns[i] = min(mns[i], v[i]);
+                mxs[i] = max(mxs[i], v[i]);
+            }
+        }
+        debug("yo3.3");
+        FT best_score = -1e100;
+        tuple<vector<FT>,Point,int> best_item_info;
+        foe(t, items_info) {
+            FT score = 0;
+            debug("yo3.4");
+            fon(i, sz(weights)) {
+                FT w = weights[i];
+                FT v = get<0>(t)[i];
+                FT mn = mns[i];
+                FT mx = mxs[i];
+                if(mn == mx) continue;
+                score += w * (1 - (v - mn) / (mx - mn));
+            }
+            debug("yo3.5");
+            if(score > best_score) {
+                best_score = score;
+                best_item_info = t;
+            }
+        }
+        debug("yo3.6");
+        return best_item_info;
+    };
+
+    // TODO: optimize by not recomputing config_spaces if they are still valid
+    // TODO: the same item can be in the to_consider many times
+    int idx = 0;
+    debug("yo1");
+    set<int> items_to_consider;
+    while(true) {
+        debug("yo2");
+        set<tuple<vector<FT>,Point,int>> items_info;
+        while(idx < sz(input.items) && sz(items_info) < to_consider) {
+            auto config_space = get_config_space(idx);
+            if(area(config_space) == 0) { // item cannot be placed
+                idx++;
+                continue;
+            }
+            auto [carea, voa, p] = get_info(idx, config_space);
+            items_info.insert({{carea, -voa, p.y(), p.x()}, p, idx}); // should always minimize
+            idx++;
+        }
+        if(idx == sz(input.items)) break;
+        debug("yo3");
+
+        auto best = get_best_item_info();
+        debug("yo4");
+        auto& item = input.items[get<2>(best)];
+        debug("yo5");
+        auto& p = get<1>(best);
+        debug("yo6");
+        debug(p);
+        add_item(item, p);
+        debug("yo6.5");
+        items_info.erase(best);
+        debug("yo7");
+        existing.join(item.move_ref_point(p).pol); // TODO: just insert instead of join?
+        debug("yo8");
+        number_of_included_items++;
+
+        debug("yo9");
+        debug(sz(items_info));
+        if(idx == sz(input.items) && sz(items_info) == 0) {
+            break;
+        }
+    }
+
+    return output;
+}
+
+/*PackingOutput HeuristicPackingNOMIP_custom::run(
     PackingInput _input,
     vector<Polygon_set> custom_containers,
     bool print,
@@ -104,9 +265,9 @@ PackingOutput HeuristicPackingNOMIP::run(PackingInput _input, bool print, int so
         sorted_idxs = input.items.sort_by_area(); // TODO: does this even sort non-increasingly?
     }
     input.items = permute(input.items, sorted_idxs);
-    /*foe(item, input.items) {
-        debug(item.pol.area().to_double());
-    }*/
+    //foe(item, input.items) {
+    //    debug(item.pol.area().to_double());
+    //}
 
     PackingOutput output (_input);
     auto add_item = [&](Item& item, Point p) {
@@ -237,31 +398,31 @@ PackingOutput HeuristicPackingGrid::run(PackingInput _input) {
     assert(number_of_containers <= number_of_steps_x * number_of_steps_y);
     cout << "[c++] Number of boxes: " << number_of_containers << endl;
 
-    /*// Divide items into containers
-    vector<ItemsContainer> items_containers (number_of_containers);
-    vector<vector<int>> items_indices (number_of_containers);
-    fon(i, sz(input.items)) {
-        auto& item = input.items[i];
-        assert(item.quantity == 1);
-        auto& item_container = items_containers[i % number_of_containers];
-        Item new_item {item.value, 1, item.pol, sz(item_container), Vector(0,0)};
-        item_container.add_item(new_item);
-        items_indices[i % number_of_containers].push_back(i);
-    }
+    // Divide items into containers
+    // vector<ItemsContainer> items_containers (number_of_containers);
+    // vector<vector<int>> items_indices (number_of_containers);
+    // fon(i, sz(input.items)) {
+    //     auto& item = input.items[i];
+    //     assert(item.quantity == 1);
+    //     auto& item_container = items_containers[i % number_of_containers];
+    //     Item new_item {item.value, 1, item.pol, sz(item_container), Vector(0,0)};
+    //     item_container.add_item(new_item);
+    //     items_indices[i % number_of_containers].push_back(i);
+    // }
     
-    // Solve each container
-    PackingOutput output (_input);
-    fon(i, number_of_containers) {
-        while(sz(items_containers[i]) > max_number_of_items_in_square * 2) items_containers[i].pop_item();
-        assert(sz(items_containers[i]) <= max_number_of_items_in_square * 2);
-        PackingInput container_input {containers[i], items_containers[i]};
-        PackingOutput toutput = HeuristicPackingNOMIP().run(container_input);
-        foe(item, toutput.items) {
-            assert(item.quantity == 1);
-            Item new_item {item.value, 1, item.pol, input.items[items_indices[i][item.idx]].idx, Vector(0,0)};
-            output.add_item(new_item);
-        }
-    }*/
+    // // Solve each container
+    // PackingOutput output (_input);
+    // fon(i, number_of_containers) {
+    //     while(sz(items_containers[i]) > max_number_of_items_in_square * 2) items_containers[i].pop_item();
+    //     assert(sz(items_containers[i]) <= max_number_of_items_in_square * 2);
+    //     PackingInput container_input {containers[i], items_containers[i]};
+    //     PackingOutput toutput = HeuristicPackingNOMIP().run(container_input);
+    //     foe(item, toutput.items) {
+    //         assert(item.quantity == 1);
+    //         Item new_item {item.value, 1, item.pol, input.items[items_indices[i][item.idx]].idx, Vector(0,0)};
+    //         output.add_item(new_item);
+    //     }
+    // }
 
     // Solve each container
     PackingOutput output (_input);
@@ -367,11 +528,9 @@ vector<Polygon_set> HeuristicPackingHelpers::overlay_grid(Polygon_set& container
 
 // const string SAMPLING_METHOD = "median_0.2";
 const string SAMPLING_METHOD = "best_mcc";
-/*
-best_mcc
-best_total
-median_0.2
-*/
+// best_mcc
+// best_total
+// median_0.2
 
 ////// ADVANCED ITEMS CONTAINER ///////
 FT AdvancedItemsContainer::sorting_metric(int idx) {
@@ -436,18 +595,19 @@ AdvancedItemsContainer::AdvancedItemsContainer(ItemsContainer& _items) {
 int AdvancedItemsContainer::size() {
     return sz(available_items);
 }
-/*int AdvancedItemsContainer::bucket_size(FT area) {
-    return sz(buckets[get_bucket_for_area_container(area)].se);
-}*/
+// int AdvancedItemsContainer::bucket_size(FT area) {
+//     return sz(buckets[get_bucket_for_area_container(area)].se);
+// }
 int AdvancedItemsContainer::get_bucket_for_area_container(FT area) {
     int bidx = 0;
     fon(i, sz(buckets)) {
         auto& a = buckets[i].fi.fi;
         auto& b = buckets[i].fi.se;
-        /*if(a <= area && area <= b) {
-            bidx = i;
-            break;
-        } else */if(b <= area) {
+        // if(a <= area && area <= b) {
+        //     bidx = i;
+        //     break;
+        // } else 
+        if(b <= area) {
             bidx = i;
         }
     }
@@ -461,14 +621,14 @@ vector<int> AdvancedItemsContainer::get_buckets_for_area_item(FT item_area) {
     if(SAMPLING_METHOD == "best_mcc" || SAMPLING_METHOD == "best_total") {
         FT min_area_container = item_area * FT(1);
         FT max_area_container = FT(1e100);
-        /*if(item_area / largest_item_area > 0.5) {
-            max_area_container = FT(1e100);
-        } else {
-            max_area_container = max(
-                item_area / smallest_item_area * largest_item_area,
-                item_area * 20
-            );
-        }*/
+        // if(item_area / largest_item_area > 0.5) {
+        //     max_area_container = FT(1e100);
+        // } else {
+        //     max_area_container = max(
+        //         item_area / smallest_item_area * largest_item_area,
+        //         item_area * 20
+        //     );
+        // }
         int min_bidx = get_bucket_for_area_container(min_area_container);
         int max_bidx = get_bucket_for_area_container(max_area_container);
         vector<int> res;
@@ -739,9 +899,9 @@ void HeuristicPackingRecursive::solve(
 
         // Solve each square recursively
         int sz_before = sz(items);
-        /*foe(square, squares) {
-            debug(area(square).to_double() / area(container).to_double());
-        }*/
+        // foe(square, squares) {
+        //     debug(area(square).to_double() / area(container).to_double());
+        // }
         foe(square, squares) {
             auto sub_packed = packed; sub_packed.intersection(square);
             auto allowed = sub_packed;
@@ -799,19 +959,19 @@ void HeuristicPackingRecursive::solve(
             sampled_items = p.fi;
             indices = p.se;
         }
-        /*if(sz(sampled_items)) {
-            debug(sz(sampled_items), sampled_items.get_average_area().to_double(), depth);
-        } else {
-            debug("no items", depth);
-        }*/
-        /*foe(item, sampled_items) {
-            ASSERT(item.pol.area() <= area(container),"");
-        }*/
-        /*auto [sampled_items, indices] = items.extract_items_random_area(
-            to_sample,
-            area(container) * 0.9,
-            depth >= 1 ? 0 : min(items.avg_area / 5, fits / MAX_ITEMS_IN_PACKING * items.avg_area / 5)
-        ); // , container_area*/
+        // if(sz(sampled_items)) {
+        //     debug(sz(sampled_items), sampled_items.get_average_area().to_double(), depth);
+        // } else {
+        //     debug("no items", depth);
+        // }
+        // foe(item, sampled_items) {
+        //     ASSERT(item.pol.area() <= area(container),"");
+        // }
+        // auto [sampled_items, indices] = items.extract_items_random_area(
+        //     to_sample,
+        //     area(container) * 0.9,
+        //     depth >= 1 ? 0 : min(items.avg_area / 5, fits / MAX_ITEMS_IN_PACKING * items.avg_area / 5)
+        // ); // , container_area
         PackingInput tinput {container, sampled_items};
         PackingOutput toutput = HeuristicPackingNOMIP().run(tinput, false);
 
@@ -855,8 +1015,8 @@ void HeuristicPackingRecursive::solve(
     empty_space.intersection(packed);
     empty_space = get_complement(empty_space);
     empty_space.intersection(container);
-    /*Polygon_set empty_space = container;
-    empty_space.intersection(get_complement(packed));*/
+    // Polygon_set empty_space = container;
+    // empty_space.intersection(get_complement(packed));
 
     // Get subcontainers
     // sub_containers.push_back(empty_space); // TODO: this is probably better in some cases
@@ -868,11 +1028,11 @@ void HeuristicPackingRecursive::solve(
     // Solve subcontainers recursively
     cout << "[c++] Number of sub-containers " << sz(sub_containers) << " at depth " << depth << endl;
     foe(sub_container, sub_containers) {
-        /*if(false && depth < 3) {
-            auto sub_packed = packed; sub_packed.intersection(sub_container);
-            solve(sub_container, items, output, sub_packed, depth + 1);
-            packed.join(sub_packed);
-        } else {*/
+        // if(false && depth < 3) {
+        //     auto sub_packed = packed; sub_packed.intersection(sub_container);
+        //     solve(sub_container, items, output, sub_packed, depth + 1);
+        //     packed.join(sub_packed);
+        // } else {
         solve(sub_container, items, output, packed, original_container_area, depth + 1);
         //}
     }

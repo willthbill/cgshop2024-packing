@@ -17,6 +17,17 @@ public:
 
 };*/
 
+
+class HeuristicPackingMultiple {
+
+private:
+
+public:
+
+    PackingOutput run(PackingInput _input, int to_consider = 1, int sort_type = 0);
+
+};
+
 class HeuristicPackingNOMIP {
 
 private:
